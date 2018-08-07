@@ -2,10 +2,8 @@
   "name": "commifreak/yii2-ldap-auth",
   "version": "1.0.0",
   "type": "yii2-extension",
-
   "description": "Another Yii2 LDAP Auth Extension",
   "keywords": ["yii2", "ldap", "auth"],
-  "license": "BSD-3-Clause",
   "support": {
     "source": "https://github.com/Commifreak/yii2-ldap-auth"
   },
@@ -15,14 +13,7 @@
       "email": "kontakt@kluthr.de"
     }
   ],
-
   "require": {
     "yiisoft/yii2": "~2.0.0"
-  },
-
-  "autoload": {
-    "psr-4": {
-      "Commifreak\\yii2\\": "src/"
-    }
   }
 }

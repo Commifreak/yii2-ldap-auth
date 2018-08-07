@@ -6,7 +6,7 @@
  * Time: 11:21
  */
 
-namespace Commifreak\yii2;
+namespace commifreak\yii2;
 
 class LdapAuth
 {
