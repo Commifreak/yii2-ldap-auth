@@ -1,9 +1,6 @@
 {
-  // package name
   "name": "Commifreak/yii2-ldap-auth",
   "version": "1.0.0",
-
-  // package type
   "type": "yii2-extension",
 
   "description": "Another Yii2 LDAP Auth Extension",
@@ -19,12 +16,10 @@
     }
   ],
 
-  // package dependencies
   "require": {
     "yiisoft/yii2": "~2.0.0"
   },
 
-  // class autoloading specs
   "autoload": {
     "psr-4": {
       "Commifreak\\yii2\\": "src/"
