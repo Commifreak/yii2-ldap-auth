@@ -51,7 +51,7 @@ class LdapAuth
 
         foreach ($this->domains as $config) {
             Yii::debug('Processing '.$config['name']);
-            if(!isset($config['autodetectIps']) || !empty($config['autodetectIps'])) {
+            if(!isset($config['autodetectIps']) || empty($config['autodetectIps'])) {
                 Yii::debug('No Ips for '.$config['name']);
                 continue;
             }
