@@ -23,8 +23,7 @@ class LdapAuth
         ['name' => 'Example', 'hostname' => 'example.tld', 'autodetectIps' => ['172.31.0.0/16', '192.168.178.0/24', '127.0.0.1'], 'baseDn' => 'DC=Example,DC=tld'],
     ];
 
-    public $ldapBaseDn = "DC=example,DC=tld";
-
+    private $_ldapBaseDn;
     private $_l;
     private $_username;
 
@@ -98,7 +97,7 @@ class LdapAuth
         }
 
         $this->_l = $l;
-        $this->ldapBaseDn = $domainData['baseDn'];
+        $this->_ldapBaseDn = $domainData['baseDn'];
         $this->_username = $username;
 
         return true;
@@ -109,7 +108,7 @@ class LdapAuth
     public function fetchUserData($attributes = ['sn', 'objectSid', 'givenName', 'mail', 'telephoneNumber']) {
         $search_filter = '(&(objectCategory=person)(samaccountname='.$this->_username.'))';
 
-        $result = ldap_search($this->_l, $this->ldapBaseDn, $search_filter, $attributes);
+        $result = ldap_search($this->_l, $this->_ldapBaseDn, $search_filter, $attributes);
 
         if($result) {
             $entries = ldap_get_entries($this->_l, $result);
