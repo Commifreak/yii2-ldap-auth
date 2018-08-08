@@ -44,6 +44,8 @@ Either you use it as standalone or add this as component:
 
 You can omit `autodetectIps` if you dont want Ips for a specific domain.
 
+__Attention!__ You need to define `baseDn`. This defines the baseDN in where the function will search for the user data!
+
 ## Usage
 
 There are 3 basic functions:
