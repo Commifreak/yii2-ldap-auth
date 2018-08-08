@@ -8,6 +8,10 @@
 
 namespace commifreak\yii2;
 
+use Yii;
+use yii\helpers\IpHelper;
+use yii\base\Exception;
+
 class LdapAuth
 {
 
