@@ -20,7 +20,7 @@ class LdapAuth
      * @var array
      */
     public $domains = [
-        'example' => ['hostname' => 'example.tld', 'autodetectIps' => ['127.0.0.1', '123.123.0.0/16']]
+        ['name' => 'Example', 'hostname' => 'example.tld', 'autodetectIps' => ['172.31.0.0/16', '192.168.178.0/24', '127.0.0.1'], 'baseDn' => 'DC=Example,DC=tld'],
     ];
 
     public $ldapBaseDn = "DC=example,DC=tld";
@@ -44,12 +44,12 @@ class LdapAuth
     public function autoDetect($overrideIp = false) {
         $clientIp = $overrideIp ? $overrideIp : (isset($_SERVER['HTTP_X_FORWARDED_FOR']) ? $_SERVER['HTTP_X_FORWARDED_FOR'] : $_SERVER['REMOTE_ADDR']);
 
-        foreach ($this->domains as $domainName => $config) {
-            Yii::debug('Processing '.$domainName);
+        foreach ($this->domains as $config) {
+            Yii::debug('Processing '.$config['name']);
             foreach ($config['autodetectIps'] as $ip) {
                 if (IpHelper::inRange($clientIp, $ip)) {
                     Yii::debug('Domain found!');
-                    $useDomain = $domainName;
+                    $useDomain = $config['name'];
                     break;
                 }
             }
@@ -70,7 +70,6 @@ class LdapAuth
 
 
         $domainData = $this->domains[$domainKey];
-        $domain = key($this->domains[$domainKey]);
 
         Yii::debug('Trying to connect to Domain #'.$domainKey.' ('.$domainData['hostname'].')');
 
@@ -83,7 +82,7 @@ class LdapAuth
         ldap_set_option($l, LDAP_OPT_REFERRALS, 0);
 
 
-        $b = @ldap_bind($l, $username.'@'.$domain, $password);
+        $b = @ldap_bind($l, $username.'@'.$domainData['name'], $password);
 
         if(!$b) {
             return false;
