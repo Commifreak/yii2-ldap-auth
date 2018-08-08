@@ -21,7 +21,8 @@ class LdapAuth
 
     public $ldapBaseDn = "DC=example,DC=tld";
 
-    private $l;
+    private $_l;
+    private $_username;
 
 
 
@@ -84,7 +85,9 @@ class LdapAuth
             return false;
         }
 
-        $this->l = $l;
+        $this->_l = $l;
+        $this->ldapBaseDn = $domainData['baseDn'];
+        $this->_username = $username;
 
 
 
@@ -93,15 +96,15 @@ class LdapAuth
 
     }
 
-    public function fetchUserSid($username) {
-        $search_filter = '(&(objectCategory=person)(samaccountname='.$username.'))';
+    public function fetchUserSid() {
+        $search_filter = '(&(objectCategory=person)(samaccountname='.$this->_username.'))';
 
         $attributes = ['sn', 'objectSid', 'givenName', 'mail', 'telephoneNumber'];
 
-        $result = ldap_search($this->l, $this->ldapBaseDn, $search_filter, $attributes);
+        $result = ldap_search($this->_l, $this->ldapBaseDn, $search_filter, $attributes);
 
         if($result) {
-            $entries = ldap_get_entries($this->l, $result);
+            $entries = ldap_get_entries($this->_l, $result);
             $sid = self::SIDtoString($entries[0]['objectsid'][0]);
             return $sid;
         }
