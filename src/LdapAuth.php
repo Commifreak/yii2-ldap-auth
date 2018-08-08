@@ -105,7 +105,7 @@ class LdapAuth
         if($result) {
             $entries = ldap_get_entries($this->_l, $result);
             $sid = self::SIDtoString($entries[0]['objectsid'][0]);
-            return [$sid => $entries[0]];
+            return ['sid' => $sid, 'entries' => $entries[0]];
         } else {
             return false;
         }
