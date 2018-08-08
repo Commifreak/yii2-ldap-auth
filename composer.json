@@ -1,6 +1,5 @@
 {
   "name": "commifreak/yii2-ldap-auth",
-  "version": "1.0.0",
   "type": "yii2-extension",
   "description": "Another Yii2 LDAP Auth Extension",
   "keywords": ["yii2", "ldap", "auth"],

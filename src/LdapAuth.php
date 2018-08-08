@@ -42,10 +42,19 @@ class LdapAuth
 
 
     public function autoDetect($overrideIp = false) {
+
+        if(count($this->domains) <= 1) {
+            return 0;
+        }
+
         $clientIp = $overrideIp ? $overrideIp : (isset($_SERVER['HTTP_X_FORWARDED_FOR']) ? $_SERVER['HTTP_X_FORWARDED_FOR'] : $_SERVER['REMOTE_ADDR']);
 
         foreach ($this->domains as $config) {
             Yii::debug('Processing '.$config['name']);
+            if(!isset($config['autodetectIps']) || !empty($config['autodetectIps'])) {
+                Yii::debug('No Ips for '.$config['name']);
+                continue;
+            }
             foreach ($config['autodetectIps'] as $ip) {
                 if (IpHelper::inRange($clientIp, $ip)) {
                     Yii::debug('Domain found!');
