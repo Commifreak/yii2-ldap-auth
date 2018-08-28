@@ -33,8 +33,8 @@ Either you use it as standalone or add this as component:
       'ldap' => [
             'class' => 'commifreak\yii2\LdapAuth',
             'domains' => [
-                ['name' => 'Domain1', 'hostname' => 'domain1.tld', 'autodetectIps' => ['172.31.0.0/16', '192.168.178.0/24', '127.0.0.1'], 'baseDn' => 'DC=Domain1,DC=tld'],
-                ['name' => 'Domain2', 'hostname' => '192.168.178.14', 'autodetectIps' => ['192.168.178.55'], 'baseDn' => 'DC=Domain2,DC=tld'],
+                ['name' => 'Domain1', 'hostname' => 'domain1.tld', 'autodetectIps' => ['172.31.0.0/16', '192.168.178.0/24', '127.0.0.1'], 'baseDn' => 'DC=Domain1,DC=tld', 'publicSearchUser' => 'example', 'publicSearchUserPassword' => 'secret'],
+                ['name' => 'Domain2', 'hostname' => '192.168.178.14', 'autodetectIps' => ['192.168.178.55'], 'baseDn' => 'DC=Domain2,DC=tld', 'publicSearchUser' => 'example', 'publicSearchUserPassword' => 'secret'],
                 ...
             ],
         ],
@@ -56,6 +56,8 @@ There are 3 basic functions:
   * Tries to connect to domain and bind to it as `$username` with `$password`
 * `fetchUserData($attributes)`
   * Queries the LDAP for the logged in user and gets some attributes (adjustable list of attributes)
+* `searchUser()`
+  * Searches for a user in the LDAP-Directory. This requires a search-user which is configured in the component options.
 
 ## Example
 
@@ -113,10 +115,10 @@ public function login()
                     $user->sid = $userData['sid'];
                 }
 
-                $user->email = $userData['entries']['mail'][0];
-                $user->firstname = $userData['entries']['givenname'][0];
-                $user->lastname = $userData['entries']['sn'][0];
-                $user->phone = $userData['entries']['telephonenumber'][0];
+                $user->email = $userData['mail'];
+                $user->firstname = $userData['givenname'];
+                $user->lastname = $userData['sn'];
+                $user->phone = $userData['telephonenumber'];
 
                 $user->validate();
                 $user->save();
