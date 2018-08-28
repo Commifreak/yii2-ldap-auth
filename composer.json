@@ -3,6 +3,7 @@
   "type": "yii2-extension",
   "description": "Another Yii2 LDAP Auth Extension",
   "keywords": ["yii2", "ldap", "auth"],
+  "license" : "BSD-3-Clause",
   "support": {
     "source": "https://github.com/Commifreak/yii2-ldap-auth"
   },
@@ -13,7 +14,7 @@
     }
   ],
   "require": {
-    "yiisoft/yii2": "~2.0.0"
+    "yiisoft/yii2": "~2.0.14"
   },
   "autoload": {
     "psr-4": {
