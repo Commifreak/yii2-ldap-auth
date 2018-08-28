@@ -112,8 +112,11 @@ class LdapAuth
 
         if ($result) {
             $entries = ldap_get_entries($this->_l, $result);
+            if($entries['count'] > 1) {
+                return false;
+            }
             $sid = self::SIDtoString($entries[0]['objectsid'][0]);
-            return ['sid' => $sid, 'entries' => $entries[0]];
+            return array_merge(['sid' => $sid], self::handleEntry($entries[0]));
         } else {
             return false;
         }
@@ -140,7 +143,7 @@ class LdapAuth
                     continue;
                 }
                 $sid = self::SIDtoString($entry['objectsid'][0]);
-                array_push($return, ['sid' => $sid, 'entry' => $entry]);
+                array_push($return, array_merge(['sid' => $sid], self::handleEntry($entry)));
             }
 
             return $return;
@@ -167,6 +170,22 @@ class LdapAuth
             $sid = $sid . "-" . hexdec($sidinhex[$start + 3] . $sidinhex[$start + 2] . $sidinhex[$start + 1] . $sidinhex[$start]);
         }
         return $sid;
+    }
+
+    public static function handleEntry($entry) {
+        $newEntry = [];
+        foreach ($entry as $attr => $value) {
+            if(is_int($attr) || $attr == 'objectsid' || !isset($value['count'])) {
+                continue;
+            }
+            $count = $value['count'];
+            $newVal = "";
+            for($i=0;$i<$count;$i++) {
+                $newVal .= $value[$i];
+            }
+            $newEntry[$attr] = $newVal;
+        }
+        return $newEntry;
     }
 
 }
