@@ -56,8 +56,9 @@ There are 3 basic functions:
   * Tries to connect to domain and bind to it as `$username` with `$password`
 * `fetchUserData($attributes)`
   * Queries the LDAP for the logged in user and gets some attributes (adjustable list of attributes)
-* `searchUser()`
+* `searchUser($searchFor, $attributes, $searchFilter)`
   * Searches for a user in the LDAP-Directory. This requires a search-user which is configured in the component options.
+  * The options let you define what attributes you want back and in which you are searching (defaults to lastname, firstname, username and class=person).
 
 ## Example
 
