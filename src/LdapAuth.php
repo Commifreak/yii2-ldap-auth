@@ -122,7 +122,7 @@ class LdapAuth
         }
     }
 
-    public function searchUser($searchFor, $attributes = ['sn', 'objectSid', 'givenName', 'mail', 'telephoneNumber'], $searchFilter = "(&(objectCategory=person)(|(samaccountname=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)))")
+    public function searchUser($searchFor, $attributes = ['sn', 'objectSid', 'givenName', 'mail', 'telephoneNumber', 'l', 'physicalDeliveryOfficeName'], $searchFilter = "(&(objectCategory=person)(|(samaccountname=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)(l=%searchFor%)(physicalDeliveryOfficeName=%searchFor%)))")
     {
 
 
