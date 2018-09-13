@@ -164,10 +164,13 @@ class LdapAuth
         foreach ($domains as $domain) {
             Yii::debug($domain, 'ldapAuth');
             if (!$this->login($domain['publicSearchUser'], $domain['publicSearchUserPassword'], $i)) {
+                Yii::error('LDAP Login error!');
                 continue;
             }
 
             $searchFilter = str_replace("%searchFor%", addslashes($searchFor), $searchFilter);
+
+            Yii::debug('Search-Filter: '.$searchFilter);
 
             $result = ldap_search($this->_l, $this->_ldapBaseDn, $searchFilter, $attributes);
 
@@ -175,6 +178,10 @@ class LdapAuth
                 $entries = ldap_get_entries($this->_l, $result);
                 foreach ($entries as $entry) {
                     if (!is_array($entry) || empty($entry)) {
+                        continue;
+                    }
+                    if(!isset($entry['objectsid'])) {
+                        Yii::warning('No objectsid! ignoring!');
                         continue;
                     }
                     $sid = self::SIDtoString($entry['objectsid'][0]);
