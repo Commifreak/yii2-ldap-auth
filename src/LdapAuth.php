@@ -83,15 +83,17 @@ class LdapAuth
 
         $l = @ldap_connect($domainData['hostname']);
         if (!$l) {
+            Yii::debug('Login failed!', 'ldapAuth');
             return false;
         }
 
         ldap_set_option($l, LDAP_OPT_PROTOCOL_VERSION, 3);
         ldap_set_option($l, LDAP_OPT_REFERRALS, 0);
 
-        $b = @ldap_bind($l, $username . '@' . $domainData['name'], $password);
+        $b = @ldap_bind($l, strpos($username, '@') === false ? $username . '@' . $domainData['name'] : $username, $password);
 
         if (!$b) {
+            Yii::debug('Bind failed!', 'ldapAuth');
             return false;
         }
 
@@ -122,34 +124,69 @@ class LdapAuth
         }
     }
 
-    public function searchUser($searchFor, $attributes = ['sn', 'objectSid', 'givenName', 'mail', 'telephoneNumber', 'l', 'physicalDeliveryOfficeName'], $searchFilter = "(&(objectCategory=person)(|(samaccountname=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)(l=%searchFor%)(physicalDeliveryOfficeName=%searchFor%)))")
+    /**
+     * @param $searchFor Search-Term
+     * @param array $attributes Attributes to get back
+     * @param string $searchFilter Filter string
+     * @param bool $autodetect Use autodetect to detect domain?
+     * @return array|bool
+     */
+    public function searchUser($searchFor, $attributes, $searchFilter, $autodetect = true)
     {
 
-
-        $domain = $this->domains[$this->autoDetect()];
-        if (!$this->login($domain['publicSearchUser'], $domain['publicSearchUserPassword'], $this->autoDetect())) {
+        if(empty($searchFor)) {
             return false;
         }
 
-        $searchFilter = str_replace("%searchFor%", addslashes($searchFor), $searchFilter);
+        if(empty($attributes)) {
+            $attributes = ['sn', 'objectSid', 'givenName', 'mail', 'telephoneNumber', 'l', 'physicalDeliveryOfficeName'];
+        }
 
-        $result = ldap_search($this->_l, $this->_ldapBaseDn, $searchFilter, $attributes);
+        if(empty($searchFilter)) {
+            $searchFilter = "(&(objectCategory=person)(|(objectSid=%searchFor%)(samaccountname=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)(l=%searchFor%)(physicalDeliveryOfficeName=%searchFor%)))";
+        }
 
-        if ($result) {
-            $return = [];
-            $entries = ldap_get_entries($this->_l, $result);
-            foreach ($entries as $entry) {
-                if (!is_array($entry) || empty($entry)) {
-                    continue;
-                }
-                $sid = self::SIDtoString($entry['objectsid'][0]);
-                array_push($return, array_merge(['sid' => $sid], self::handleEntry($entry)));
+        if($autodetect) {
+            $autoDomain = $this->autoDetect();
+        } else {
+            $autoDomain = false;
+        }
+
+
+        if ($autodetect && $autoDomain === false) {
+            return false;
+        }
+
+        $domains = $autodetect ? [$this->domains[$autoDomain]] : $this->domains;
+
+        $return = [];
+        $i = 0;
+        foreach ($domains as $domain) {
+            Yii::debug($domain, 'ldapAuth');
+            if (!$this->login($domain['publicSearchUser'], $domain['publicSearchUserPassword'], $i)) {
+                continue;
             }
 
-            return $return;
-        } else {
-            return false;
+            $searchFilter = str_replace("%searchFor%", addslashes($searchFor), $searchFilter);
+
+            $result = ldap_search($this->_l, $this->_ldapBaseDn, $searchFilter, $attributes);
+
+            if ($result) {
+                $entries = ldap_get_entries($this->_l, $result);
+                foreach ($entries as $entry) {
+                    if (!is_array($entry) || empty($entry)) {
+                        continue;
+                    }
+                    $sid = self::SIDtoString($entry['objectsid'][0]);
+                    array_push($return, array_merge(['sid' => $sid], self::handleEntry($entry)));
+                }
+            }
+            $i++;
         }
+
+        return empty($return) ? [] : $return;
+
+
     }
 
     public static function SIDtoString($ADsid)
