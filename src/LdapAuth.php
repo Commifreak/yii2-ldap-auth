@@ -20,7 +20,7 @@ class LdapAuth
      * @var array
      */
     public $domains = [
-        ['name' => 'Example', 'hostname' => 'example.tld', 'autodetectIps' => ['172.31.0.0/16', '192.168.178.0/24', '127.0.0.1'], 'baseDn' => 'DC=Example,DC=tld', 'publicSearchUser' => 'example', 'publicSearchUserPassword' => 'secret'],
+        ['name' => 'Example', 'hostname' => 'example.tld', 'autodetectIps' => ['172.31.0.0/16', '192.168.178.0/24', '127.0.0.1'], 'baseDn' => 'DC=Example,DC=tld', 'publicSearchUser' => 'example@domain', 'publicSearchUserPassword' => 'secret'],
     ];
 
     private $_ldapBaseDn;
@@ -185,7 +185,7 @@ class LdapAuth
                         continue;
                     }
                     $sid = self::SIDtoString($entry['objectsid'][0]);
-                    array_push($return, array_merge(['sid' => $sid], self::handleEntry($entry)));
+                    array_push($return, array_merge(['sid' => $sid, 'domainKey' => $i], self::handleEntry($entry)));
                 }
             }
             $i++;
