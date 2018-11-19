@@ -131,7 +131,7 @@ class LdapAuth
      * @param bool $autodetect Use autodetect to detect domain?
      * @return array|bool
      */
-    public function searchUser($searchFor, $attributes, $searchFilter, $autodetect = true)
+    public function searchUser($searchFor, $attributes = "", $searchFilter = "", $autodetect = true)
     {
 
         if(empty($searchFor)) {
