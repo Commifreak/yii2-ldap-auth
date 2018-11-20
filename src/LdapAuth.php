@@ -185,7 +185,7 @@ class LdapAuth
                         continue;
                     }
                     $sid = self::SIDtoString($entry['objectsid'][0]);
-                    array_push($return, array_merge(['sid' => $sid, 'domainKey' => $i], self::handleEntry($entry)));
+                    array_push($return, array_merge(['sid' => $sid, 'dn' => $entry['dn'], 'domainKey' => $i], self::handleEntry($entry)));
                 }
             }
             $i++;
