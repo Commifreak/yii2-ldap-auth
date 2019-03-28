@@ -89,6 +89,7 @@ class LdapAuth
 
         ldap_set_option($l, LDAP_OPT_PROTOCOL_VERSION, 3);
         ldap_set_option($l, LDAP_OPT_REFERRALS, 0);
+        ldap_set_option($l, LDAP_OPT_NETWORK_TIMEOUT, 3);
 
         $b = @ldap_bind($l, strpos($username, '@') === false ? $username . '@' . $domainData['name'] : $username, $password);
 
