@@ -18,7 +18,7 @@ This extensions adds a simple LDAP-Auth mechanism for your yii2 application
 Preferred way to install, is through composer:
 
 ```
-composer require commifreal/yii2-ldap-auth
+composer require commifreak/yii2-ldap-auth
 ```
 
 ## Setup
