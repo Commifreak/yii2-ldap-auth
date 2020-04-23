@@ -48,7 +48,7 @@ __Attention!__ You need to define `baseDn`. This defines the baseDN in where the
 
 ## Usage
 
-There are 3 basic functions:
+There are 4 basic functions:
 
 * `autoDetect()`
   * Tries to detect the User's client IP (with Proxy support) and determines the Domain to use
