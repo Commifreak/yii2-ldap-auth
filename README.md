@@ -32,6 +32,8 @@ Either you use it as standalone or add this as component:
       ...
       'ldap' => [
             'class' => 'commifreak\yii2\LdapAuth',
+               // If you want to specify another attribute than "samaccountname" to check your username (or email) against, enable the following option:
+            //'usernameAttribute' => 'mail',
             'domains' => [
                 ['name' => 'Domain1', 'hostname' => 'domain1.tld', 'autodetectIps' => ['172.31.0.0/16', '192.168.178.0/24', '127.0.0.1'], 'baseDn' => 'DC=Domain1,DC=tld', 'publicSearchUser' => 'example@domain', 'publicSearchUserPassword' => 'secret'],
                 ['name' => 'Domain2', 'hostname' => '192.168.178.14', 'autodetectIps' => ['192.168.178.55'], 'baseDn' => 'DC=Domain2,DC=tld', 'publicSearchUser' => 'example@domain', 'publicSearchUserPassword' => 'secret'],
