@@ -9,8 +9,8 @@
 namespace commifreak\yii2;
 
 use Yii;
-use yii\helpers\IpHelper;
 use yii\base\Exception;
+use yii\helpers\IpHelper;
 
 class LdapAuth
 {
@@ -20,9 +20,21 @@ class LdapAuth
      * @var array
      */
     public $domains = [
-        ['name' => 'Example', 'hostname' => 'example.tld', 'autodetectIps' => ['172.31.0.0/16', '192.168.178.0/24', '127.0.0.1'], 'baseDn' => 'DC=Example,DC=tld', 'publicSearchUser' => 'example@domain', 'publicSearchUserPassword' => 'secret'],
+        [
+            'name' => 'Example',
+            'hostname' => 'example.tld',
+            'autodetectIps' => ['172.31.0.0/16', '192.168.178.0/24', '127.0.0.1'],
+            'baseDn' => 'DC=Example,DC=tld',
+            'publicSearchUser' => 'example@domain',
+            'publicSearchUserPassword' => 'secret',
+        ],
     ];
 
+    /**
+     * Attribute being used for the fetchUserData function
+     * @var string
+     */
+    public $usernameAttribute = 'samaccountname';
     private $_ldapBaseDn;
     private $_l;
     private $_username;
@@ -109,13 +121,13 @@ class LdapAuth
 
     public function fetchUserData($attributes = ['sn', 'objectSid', 'givenName', 'mail', 'telephoneNumber'])
     {
-        $search_filter = '(&(objectCategory=person)(samaccountname=' . $this->_username . '))';
+        $search_filter = '(&(objectCategory=person)(' . $this->usernameAttribute . '=' . $this->_username . '))';
 
         $result = ldap_search($this->_l, $this->_ldapBaseDn, $search_filter, $attributes);
 
         if ($result) {
             $entries = ldap_get_entries($this->_l, $result);
-            if($entries['count'] > 1) {
+            if ($entries['count'] > 1) {
                 return false;
             }
             $sid = self::SIDtoString($entries[0]['objectsid'][0]);
@@ -135,19 +147,19 @@ class LdapAuth
     public function searchUser($searchFor, $attributes = "", $searchFilter = "", $autodetect = true)
     {
 
-        if(empty($searchFor)) {
+        if (empty($searchFor)) {
             return false;
         }
 
-        if(empty($attributes)) {
+        if (empty($attributes)) {
             $attributes = ['sn', 'objectSid', 'givenName', 'mail', 'telephoneNumber', 'l', 'physicalDeliveryOfficeName'];
         }
 
-        if(empty($searchFilter)) {
-            $searchFilter = "(&(objectCategory=person)(|(objectSid=%searchFor%)(samaccountname=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)(l=%searchFor%)(physicalDeliveryOfficeName=%searchFor%)))";
+        if (empty($searchFilter)) {
+            $searchFilter = "(&(objectCategory=person)(|(objectSid=%searchFor%)(samaccountname=*%searchFor%*)(mail=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)(l=%searchFor%)(physicalDeliveryOfficeName=%searchFor%)))";
         }
 
-        if($autodetect) {
+        if ($autodetect) {
             $autoDomain = $this->autoDetect();
         } else {
             $autoDomain = false;
@@ -171,7 +183,7 @@ class LdapAuth
 
             $searchFilter = str_replace("%searchFor%", addslashes($searchFor), $searchFilter);
 
-            Yii::debug('Search-Filter: '.$searchFilter);
+            Yii::debug('Search-Filter: ' . $searchFilter);
 
             $result = ldap_search($this->_l, $this->_ldapBaseDn, $searchFilter, $attributes);
 
@@ -181,7 +193,7 @@ class LdapAuth
                     if (!is_array($entry) || empty($entry)) {
                         continue;
                     }
-                    if(!isset($entry['objectsid'])) {
+                    if (!isset($entry['objectsid'])) {
                         Yii::warning('No objectsid! ignoring!');
                         continue;
                     }
@@ -217,15 +229,16 @@ class LdapAuth
         return $sid;
     }
 
-    public static function handleEntry($entry) {
+    public static function handleEntry($entry)
+    {
         $newEntry = [];
         foreach ($entry as $attr => $value) {
-            if(is_int($attr) || $attr == 'objectsid' || !isset($value['count'])) {
+            if (is_int($attr) || $attr == 'objectsid' || !isset($value['count'])) {
                 continue;
             }
             $count = $value['count'];
             $newVal = "";
-            for($i=0;$i<$count;$i++) {
+            for ($i = 0; $i < $count; $i++) {
                 $newVal .= $value[$i];
             }
             $newEntry[$attr] = $newVal;
