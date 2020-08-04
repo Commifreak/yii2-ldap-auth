@@ -30,11 +30,6 @@ class LdapAuth
         ],
     ];
 
-    /**
-     * Attribute being used for the fetchUserData function
-     * @var string
-     */
-    public $usernameAttribute = 'samaccountname';
     private $_ldapBaseDn;
     private $_l;
     private $_username;
@@ -121,7 +116,7 @@ class LdapAuth
 
     public function fetchUserData($attributes = ['sn', 'objectSid', 'givenName', 'mail', 'telephoneNumber'])
     {
-        $search_filter = '(&(objectCategory=person)(' . $this->usernameAttribute . '=' . $this->_username . '))';
+        $search_filter = '(&(objectCategory=person)(samaccountname=' . $this->_username . '))';
 
         $result = ldap_search($this->_l, $this->_ldapBaseDn, $search_filter, $attributes);
 
