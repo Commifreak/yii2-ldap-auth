@@ -114,8 +114,14 @@ class LdapAuth
 
     }
 
-    public function fetchUserData($attributes = ['sn', 'objectSid', 'givenName', 'mail', 'telephoneNumber'])
+    public function fetchUserData($attributes = "")
     {
+        if (empty($attributes)) {
+            $attributes = ['sn', 'objectSid', 'givenName', 'mail', 'telephoneNumber'];
+        }
+
+        array_push($attributes, 'objectSid'); # Push objectsid, regardless of source array, as we need it ALWAYS!
+
         $search_filter = '(&(objectCategory=person)(samaccountname=' . $this->_username . '))';
 
         $result = ldap_search($this->_l, $this->_ldapBaseDn, $search_filter, $attributes);
@@ -149,6 +155,8 @@ class LdapAuth
         if (empty($attributes)) {
             $attributes = ['sn', 'objectSid', 'givenName', 'mail', 'telephoneNumber', 'l', 'physicalDeliveryOfficeName'];
         }
+
+        array_push($attributes, 'objectSid'); # Push objectsid, regardless of source array, as we need it ALWAYS!
 
         if (empty($searchFilter)) {
             $searchFilter = "(&(objectCategory=person)(|(objectSid=%searchFor%)(samaccountname=*%searchFor%*)(mail=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)(l=%searchFor%)(physicalDeliveryOfficeName=%searchFor%)))";
