@@ -9,6 +9,7 @@
 namespace commifreak\yii2;
 
 use Yii;
+use yii\base\ErrorException;
 use yii\base\Exception;
 use yii\helpers\IpHelper;
 
@@ -42,6 +43,22 @@ class LdapAuth
             throw new Exception("LDAP-extension missing :(");
         }
 
+    }
+
+    // Thanks to: https://www.php.net/manual/de/function.ldap-connect.php#115662
+    private function serviceping($host, $port = 389, $timeout = 3)
+    {
+        try {
+            $op = fsockopen($host, $port, $errno, $errstr, $timeout);
+        } catch (ErrorException $e) {
+            Yii::error('fsockopen failure!');
+            return false;
+        }
+        if (!$op) return false; //DC is N/A
+        else {
+            fclose($op); //explicitly close open socket connection
+            return true; //DC is up & running, we can safely connect with ldap_connect
+        }
     }
 
 
@@ -87,6 +104,11 @@ class LdapAuth
         $domainData = $this->domains[$domainKey];
 
         Yii::debug('Trying to connect to Domain #' . $domainKey . ' (' . $domainData['hostname'] . ')');
+
+        if (!self::serviceping($domainData['hostname'])) {
+            Yii::error('Connection failed!');
+            return false;
+        }
 
         $l = @ldap_connect($domainData['hostname']);
         if (!$l) {
