@@ -122,7 +122,7 @@ class LdapAuth
 
             if (!file_exists($ldaprcfile)) {
                 // Try to create the file
-                if (!file_put_contents($ldaprcfile, 'TLS_REQCERT allow')) {
+                if (!@file_put_contents($ldaprcfile, 'TLS_REQCERT allow')) {
                     Yii::error('Cannot create required .ldaprc control file!');
                     return false;
                 }
@@ -264,7 +264,7 @@ class LdapAuth
                         continue;
                     }
                     $sid = self::SIDtoString($entry['objectsid'][0]);
-                    array_push($return, array_merge(['sid' => $sid, 'dn' => $entry['dn'], 'domainKey' => $i], self::handleEntry($entry)));
+                    array_push($return, array_merge(['sid' => $sid, 'dn' => $entry['dn'], 'domainKey' => $i, 'domainName' => $this->domains[$i]['name']], self::handleEntry($entry)));
                 }
             }
             $i++;
