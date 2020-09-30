@@ -23,6 +23,7 @@ class LdapAuth
     public $domains = [
         [
             'name' => 'Example',
+            'useSSL' => false,
             'hostname' => 'example.tld',
             'autodetectIps' => ['172.31.0.0/16', '192.168.178.0/24', '127.0.0.1'],
             'baseDn' => 'DC=Example,DC=tld',
@@ -48,6 +49,12 @@ class LdapAuth
     // Thanks to: https://www.php.net/manual/de/function.ldap-connect.php#115662
     private function serviceping($host, $port = 389, $timeout = 3)
     {
+        if ($port === null) {
+            $port = 389;
+        }
+
+        Yii::debug('Host: ' . $host . ' Port: ' . $port, __METHOD__);
+
         try {
             $op = fsockopen($host, $port, $errno, $errstr, $timeout);
         } catch (ErrorException $e) {
@@ -71,48 +78,53 @@ class LdapAuth
 
         $clientIp = $overrideIp ? $overrideIp : (isset($_SERVER['HTTP_X_FORWARDED_FOR']) ? $_SERVER['HTTP_X_FORWARDED_FOR'] : $_SERVER['REMOTE_ADDR']);
 
+        $index = 0;
         foreach ($this->domains as $config) {
-            Yii::debug('Processing ' . $config['name']);
+            Yii::debug('[Autodetect] Processing ' . $config['name'], __METHOD__);
             if (!isset($config['autodetectIps']) || empty($config['autodetectIps'])) {
-                Yii::debug('No Ips for ' . $config['name']);
+                Yii::debug('[Autodetect] No Ips for ' . $config['name'], __METHOD__);
                 continue;
             }
             foreach ($config['autodetectIps'] as $ip) {
                 if (IpHelper::inRange($clientIp, $ip)) {
-                    Yii::debug('Domain found!');
-                    $useDomain = $config['name'];
-                    break;
+                    Yii::debug('[Autodetect] Domain found!', __METHOD__);
+                    return $index;
                 }
             }
-            if (isset($useDomain)) {
-                break;
-            }
+            $index++;
         }
 
-        if (isset($useDomain)) {
-            return array_search($useDomain, array_keys($this->domains));
-        } else {
-            return false;
-        }
+        Yii::debug('[Autodetect] No suitable domain found :(', __METHOD__);
+        return false;
     }
 
 
     public function login($username, $password, $domainKey)
     {
 
+        Yii::debug('Hello! :) Trying to log you in via LDAP!');
+
 
         $domainData = $this->domains[$domainKey];
 
+        $ssl = isset($domainData['useSSL']) && $domainData['useSSL'];
+        Yii::debug('Use SSL here? ' . ($ssl ? 'Yes' : 'No'));
+
         Yii::debug('Trying to connect to Domain #' . $domainKey . ' (' . $domainData['hostname'] . ')');
 
-        if (!self::serviceping($domainData['hostname'])) {
+        if (!self::serviceping($domainData['hostname'], $ssl ? 636 : null)) {
             Yii::error('Connection failed!');
             return false;
         }
 
-        $l = @ldap_connect($domainData['hostname']);
+        $hostPrefix = ($ssl ? 'ldaps://' : 'ldap://') . $domainData['hostname'];
+        $port = $ssl ? 636 : 389;
+
+        Yii::debug('Connecting to ' . $hostPrefix . ', Port: ' . $port, __METHOD__);
+
+        $l = @ldap_connect($hostPrefix, $port);
         if (!$l) {
-            Yii::debug('Login failed!', 'ldapAuth');
+            Yii::debug('Connect failed! ' . ldap_error($l), 'ldapAuth');
             return false;
         }
 
@@ -120,10 +132,14 @@ class LdapAuth
         ldap_set_option($l, LDAP_OPT_REFERRALS, 0);
         ldap_set_option($l, LDAP_OPT_NETWORK_TIMEOUT, 3);
 
-        $b = @ldap_bind($l, strpos($username, '@') === false ? $username . '@' . $domainData['name'] : $username, $password);
+        $bind_dn = strpos($username, '@') === false ? $username . '@' . $domainData['name'] : $username;
+
+        Yii::debug('Trying to authenticate with DN ' . $bind_dn);
+
+        $b = @ldap_bind($l, $bind_dn, $password);
 
         if (!$b) {
-            Yii::debug('Bind failed!', 'ldapAuth');
+            Yii::debug('Bind failed! ' . ldap_error($l), 'ldapAuth');
             return false;
         }
 
