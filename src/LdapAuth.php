@@ -264,7 +264,12 @@ class LdapAuth
                         continue;
                     }
                     $sid = self::SIDtoString($entry['objectsid'][0]);
-                    array_push($return, array_merge(['sid' => $sid, 'dn' => $entry['dn'], 'domainKey' => $i, 'domainName' => $this->domains[$i]['name']], self::handleEntry($entry)));
+                    $additionalData = ['sid' => $sid, 'dn' => $entry['dn'], 'domainKey' => $i];
+                    if (count($this->domains) > 1) {
+                        // Enable domainName output if more than one domains configured
+                        $additionalData['domainName'] = $this->domains[$i]['name'];
+                    }
+                    array_push($return, array_merge($additionalData, self::handleEntry($entry)));
                 }
             }
             $i++;
