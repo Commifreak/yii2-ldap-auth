@@ -94,7 +94,7 @@ class LdapAuth
             $index++;
         }
 
-        Yii::debug('[Autodetect] No suitable domain found :(', __METHOD__);
+        Yii::warning('[Autodetect] No suitable domain found :(', __METHOD__);
         return false;
     }
 
@@ -110,6 +110,31 @@ class LdapAuth
         $ssl = isset($domainData['useSSL']) && $domainData['useSSL'];
         Yii::debug('Use SSL here? ' . ($ssl ? 'Yes' : 'No'));
 
+        if ($ssl) {
+            // When using SSL, we have to set some env variables and create an ldap controlfile - otherwirse a connect with non valid certificat will fail!
+
+            /**
+             * Inhalt der .ldaprc:
+             * TLS_REQCERT allow
+             *
+             */
+            $ldaprcfile = $_SERVER['HOME'] . '/.ldaprc';
+
+            if (!file_exists($ldaprcfile)) {
+                // Try to create the file
+                if (!file_put_contents($ldaprcfile, 'TLS_REQCERT allow')) {
+                    Yii::error('Cannot create required .ldaprc control file!');
+                    return false;
+                }
+            } else {
+                Yii::debug('.ldaprc file exists!');
+            }
+
+            putenv('LDAPCONF=' . $ldaprcfile);
+            putenv('LDAPTLS_REQCERT=allow');
+            putenv('TLS_REQCERT=allow');
+        }
+
         Yii::debug('Trying to connect to Domain #' . $domainKey . ' (' . $domainData['hostname'] . ')');
 
         if (!self::serviceping($domainData['hostname'], $ssl ? 636 : null)) {
@@ -124,7 +149,7 @@ class LdapAuth
 
         $l = @ldap_connect($hostPrefix, $port);
         if (!$l) {
-            Yii::debug('Connect failed! ' . ldap_error($l), 'ldapAuth');
+            Yii::warning('Connect failed! ' . ldap_error($l), 'ldapAuth');
             return false;
         }
 
@@ -139,7 +164,7 @@ class LdapAuth
         $b = @ldap_bind($l, $bind_dn, $password);
 
         if (!$b) {
-            Yii::debug('Bind failed! ' . ldap_error($l), 'ldapAuth');
+            Yii::warning('Bind failed! ' . ldap_error($l), 'ldapAuth');
             return false;
         }
 
