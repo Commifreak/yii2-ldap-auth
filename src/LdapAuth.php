@@ -180,10 +180,11 @@ class LdapAuth
     public function fetchUserData($attributes = "")
     {
         if (empty($attributes)) {
-            $attributes = ['sn', 'objectSid', 'givenName', 'mail', 'telephoneNumber'];
+            $attributes = ['sn', 'objectSid', 'sIDHistory', 'givenName', 'mail', 'telephoneNumber'];
         }
 
         array_push($attributes, 'objectSid'); # Push objectsid, regardless of source array, as we need it ALWAYS!
+        array_push($attributes, 'sIDHistory'); # Push sIDHistory, regardless of source array, as we need it ALWAYS!
 
         $search_filter = '(&(objectCategory=person)(samaccountname=' . $this->_username . '))';
 
@@ -194,8 +195,9 @@ class LdapAuth
             if ($entries['count'] > 1) {
                 return false;
             }
-            $sid = self::SIDtoString($entries[0]['objectsid'][0]);
-            return array_merge(['sid' => $sid], self::handleEntry($entries[0]));
+            $sid = self::SIDtoString($entries[0]['objectsid'])[0];
+            $sidHistory = isset($entries[0]['sidhistory']) ? self::SIDtoString($entries[0]['sidhistory']) : null;
+            return array_merge(['sid' => $sid, 'sidhistory' => $sidHistory], self::handleEntry($entries[0]));
         } else {
             return false;
         }
@@ -216,13 +218,14 @@ class LdapAuth
         }
 
         if (empty($attributes)) {
-            $attributes = ['sn', 'objectSid', 'givenName', 'mail', 'telephoneNumber', 'l', 'physicalDeliveryOfficeName'];
+            $attributes = ['sn', 'objectSid', 'sIDHistory', 'givenName', 'mail', 'telephoneNumber', 'l', 'physicalDeliveryOfficeName'];
         }
 
         array_push($attributes, 'objectSid'); # Push objectsid, regardless of source array, as we need it ALWAYS!
+        array_push($attributes, 'sIDHistory'); # Push sIDHistory, regardless of source array, as we need it ALWAYS!
 
         if (empty($searchFilter)) {
-            $searchFilter = "(&(objectCategory=person)(|(objectSid=%searchFor%)(samaccountname=*%searchFor%*)(mail=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)(l=%searchFor%)(physicalDeliveryOfficeName=%searchFor%)))";
+            $searchFilter = "(&(objectCategory=person)(|(objectSid=%searchFor%)(sIDHistory=%searchFor%)(samaccountname=*%searchFor%*)(mail=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)(l=%searchFor%)(physicalDeliveryOfficeName=%searchFor%)))";
         }
 
         if ($autodetect) {
@@ -263,8 +266,9 @@ class LdapAuth
                         Yii::warning('No objectsid! ignoring!');
                         continue;
                     }
-                    $sid = self::SIDtoString($entry['objectsid'][0]);
-                    $additionalData = ['sid' => $sid, 'dn' => $entry['dn'], 'domainKey' => $i];
+                    $sid = self::SIDtoString($entry['objectsid'])[0];
+                    $sidHistory = isset($entry['sidhistory']) ? self::SIDtoString($entry['sidhistory']) : null;
+                    $additionalData = ['sid' => $sid, 'sidhistory' => $sidHistory, 'dn' => $entry['dn'], 'domainKey' => $i];
                     if (count($this->domains) > 1) {
                         // Enable domainName output if more than one domains configured
                         $additionalData['domainName'] = $this->domains[$i]['name'];
@@ -282,29 +286,36 @@ class LdapAuth
 
     public static function SIDtoString($ADsid)
     {
-        $sid = "S-";
-        //$ADguid = $info[0]['objectguid'][0];
-        $sidinhex = str_split(bin2hex($ADsid), 2);
-        // Byte 0 = Revision Level
-        $sid = $sid . hexdec($sidinhex[0]) . "-";
-        // Byte 1-7 = 48 Bit Authority
-        $sid = $sid . hexdec($sidinhex[6] . $sidinhex[5] . $sidinhex[4] . $sidinhex[3] . $sidinhex[2] . $sidinhex[1]);
-        // Byte 8 count of sub authorities - Get number of sub-authorities
-        $subauths = hexdec($sidinhex[7]);
-        //Loop through Sub Authorities
-        for ($i = 0; $i < $subauths; $i++) {
-            $start = 8 + (4 * $i);
-            // X amount of 32Bit (4 Byte) Sub Authorities
-            $sid = $sid . "-" . hexdec($sidinhex[$start + 3] . $sidinhex[$start + 2] . $sidinhex[$start + 1] . $sidinhex[$start]);
+        $results = [];
+        Yii::debug('Converting SID...', __METHOD__);
+        for ($cnt = 0; $cnt < $ADsid['count']; $cnt++) {
+            Yii::debug('Run ' . $cnt, __METHOD__);
+            $sid = "S-";
+            //$ADguid = $info[0]['objectguid'][0];
+            $sidinhex = str_split(bin2hex($ADsid[$cnt]), 2);
+            // Byte 0 = Revision Level
+            $sid = $sid . hexdec($sidinhex[0]) . "-";
+            // Byte 1-7 = 48 Bit Authority
+            $sid = $sid . hexdec($sidinhex[6] . $sidinhex[5] . $sidinhex[4] . $sidinhex[3] . $sidinhex[2] . $sidinhex[1]);
+            // Byte 8 count of sub authorities - Get number of sub-authorities
+            $subauths = hexdec($sidinhex[7]);
+            //Loop through Sub Authorities
+            for ($i = 0; $i < $subauths; $i++) {
+                $start = 8 + (4 * $i);
+                // X amount of 32Bit (4 Byte) Sub Authorities
+                $sid = $sid . "-" . hexdec($sidinhex[$start + 3] . $sidinhex[$start + 2] . $sidinhex[$start + 1] . $sidinhex[$start]);
+            }
+            Yii::debug('Converted SID to: ' . $sid, __METHOD__);
+            array_push($results, $sid);
         }
-        return $sid;
+        return $results;
     }
 
     public static function handleEntry($entry)
     {
         $newEntry = [];
         foreach ($entry as $attr => $value) {
-            if (is_int($attr) || $attr == 'objectsid' || !isset($value['count'])) {
+            if (is_int($attr) || $attr == 'objectsid' || $attr == 'sidhistory' || !isset($value['count'])) {
                 continue;
             }
             $count = $value['count'];
