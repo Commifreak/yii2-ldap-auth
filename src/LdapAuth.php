@@ -32,6 +32,18 @@ class LdapAuth
         ],
     ];
 
+    /**
+     * If false (default) any user search would return the whole result.
+     * If true, the script checks every users sidHistory and only return results which are newer (migrated).
+     * A use case for `true`: You have two domains and user "Foo" was copied from Domain 1 to Domain 2 without deleting it from Domain 1 - now you have 2 results for a search "Foo", but the entry in Domain 2 has a set "sidHistory" with its sid from Domain 1.
+     * Setting this tp true will filter out the "Foo" from Domain 1, since its sid is listed in the Domain 2 entry of it.
+     *
+     * @see https://docs.microsoft.com/en-us/windows/win32/adschema/a-sidhistory
+     * @see https://ldapwiki.com/wiki/SIDHistory
+     * @var bool
+     */
+    public $filterBySidhistory = false;
+
     private $_ldapBaseDn;
     private $_l;
     private $_username;
@@ -268,12 +280,34 @@ class LdapAuth
                     }
                     $sid = self::SIDtoString($entry['objectsid'])[0];
                     $sidHistory = isset($entry['sidhistory']) ? self::SIDtoString($entry['sidhistory']) : null;
+
+
+                    if ($this->filterBySidhistory) {
+                        // Check if this user is maybe already listed in the results - ifo so, determine which one is newer
+                        foreach ($return as $_sid => $_data) {
+                            if (!empty($_data['sidhistory']) && in_array($sid, $_data['sidhistory'])) {
+                                Yii::debug('This user is listed in another users history - skipping');
+                                continue 2;
+                            }
+                        }
+
+                        if ($sidHistory) {
+                            foreach ($sidHistory as $item) {
+                                if (array_key_exists($item, $return)) {
+                                    Yii::debug('User already exists with its sidhistory in results! Unsetting the old entry...');
+                                    unset($return[$item]);
+                                }
+                            }
+                        }
+                    }
+
+
                     $additionalData = ['sid' => $sid, 'sidhistory' => $sidHistory, 'dn' => $entry['dn'], 'domainKey' => $i];
                     if (count($this->domains) > 1) {
                         // Enable domainName output if more than one domains configured
                         $additionalData['domainName'] = $this->domains[$i]['name'];
                     }
-                    array_push($return, array_merge($additionalData, self::handleEntry($entry)));
+                    $return[$sid] = array_merge($additionalData, self::handleEntry($entry));
                 }
             }
             $i++;

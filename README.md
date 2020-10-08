@@ -12,6 +12,7 @@ This extensions adds a simple LDAP-Auth mechanism for your yii2 application
 * User login via LDAP
 * Read self defined LDAP attributes
 * Domain autodetection based on IPFilter.
+* Filter out results by checking every results `sidHistory`
 
 ## Installation
 
@@ -30,6 +31,7 @@ Either you use it as standalone or add this as component:
    'components' => [
       'ldap' => [
             'class' => 'commifreak\yii2\LdapAuth',
+            'filterBySidhistory' => false, // Filter by checking sidHistory?
             'domains' => [
                 ['name' => 'Domain1', 'hostname' => 'domain1.tld', 'autodetectIps' => ['172.31.0.0/16', '192.168.178.0/24', '127.0.0.1'], 'baseDn' => 'DC=Domain1,DC=tld', 'publicSearchUser' => 'example@domain', 'publicSearchUserPassword' => 'secret'],
                 ['name' => 'Domain2', 'hostname' => '192.168.178.14', 'autodetectIps' => ['192.168.178.55'], 'baseDn' => 'DC=Domain2,DC=tld', 'publicSearchUser' => 'example@domain', 'publicSearchUserPassword' => 'secret'],
@@ -40,7 +42,7 @@ Either you use it as standalone or add this as component:
 ]
 ```
 
-You can omit `autodetectIps` if you dont want Ips for a specific domain.
+You can omit `autodetectIps` if you don't want Ips for a specific domain.
 
 __Attention!__ You need to define `baseDn`. This defines the baseDN in where the function will search for the user data!
 
