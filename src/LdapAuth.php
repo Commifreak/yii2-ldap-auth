@@ -209,7 +209,7 @@ class LdapAuth
 
         if ($result) {
             $entries = ldap_get_entries($this->_l, $result);
-            if ($entries['count'] > 1) {
+            if ($entries['count'] > 1 || $entries['count'] == 0) {
                 return false;
             }
             $sid = self::SIDtoString($entries[0]['objectsid'])[0];
