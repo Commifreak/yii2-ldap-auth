@@ -257,9 +257,9 @@ class LdapAuth
         }
 
         $domains = $autodetect ? [$this->domains[$autoDomain]] : $this->domains;
+        $i = $autodetect ? $autoDomain : 0;
 
         $return = [];
-        $i = 0;
         foreach ($domains as $domain) {
             Yii::debug($domain, 'ldapAuth');
             if (!$this->login($domain['publicSearchUser'], $domain['publicSearchUserPassword'], $i)) {
