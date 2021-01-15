@@ -59,7 +59,7 @@ class LdapAuth
     }
 
     // Thanks to: https://www.php.net/manual/de/function.ldap-connect.php#115662
-    private function serviceping($host, $port = 389, $timeout = 3)
+    private function serviceping($host, $port = 389, $timeout = 5)
     {
         if ($port === null) {
             $port = 389;
@@ -70,7 +70,7 @@ class LdapAuth
         try {
             $op = fsockopen($host, $port, $errno, $errstr, $timeout);
         } catch (ErrorException $e) {
-            Yii::error('fsockopen failure!');
+            Yii::error('fsockopen failure!', __METHOD__);
             return false;
         }
         if (!$op) return false; //DC is N/A
@@ -119,13 +119,13 @@ class LdapAuth
     public function login($username, $password, $domainKey)
     {
 
-        Yii::debug('Hello! :) Trying to log you in via LDAP!');
+        Yii::debug('Hello! :) Trying to log you in via LDAP!', __METHOD__);
 
 
         $domainData = $this->domains[$domainKey];
 
         $ssl = isset($domainData['useSSL']) && $domainData['useSSL'];
-        Yii::debug('Use SSL here? ' . ($ssl ? 'Yes' : 'No'));
+        Yii::debug('Use SSL here? ' . ($ssl ? 'Yes' : 'No'), __METHOD__);
 
         if ($ssl) {
             // When using SSL, we have to set some env variables and create an ldap controlfile - otherwirse a connect with non valid certificat will fail!
@@ -140,11 +140,11 @@ class LdapAuth
             if (!file_exists($ldaprcfile)) {
                 // Try to create the file
                 if (!@file_put_contents($ldaprcfile, 'TLS_REQCERT allow')) {
-                    Yii::error('Cannot create required .ldaprc control file!');
+                    Yii::error('Cannot create required .ldaprc control file!', __METHOD__);
                     return false;
                 }
             } else {
-                Yii::debug('.ldaprc file exists!');
+                Yii::debug('.ldaprc file exists!', __METHOD__);
             }
 
             putenv('LDAPCONF=' . $ldaprcfile);
@@ -152,10 +152,10 @@ class LdapAuth
             putenv('TLS_REQCERT=allow');
         }
 
-        Yii::debug('Trying to connect to Domain #' . $domainKey . ' (' . $domainData['hostname'] . ')');
+        Yii::debug('Trying to connect to Domain #' . $domainKey . ' (' . $domainData['hostname'] . ')', __METHOD__);
 
         if (!self::serviceping($domainData['hostname'], $ssl ? 636 : null)) {
-            Yii::error('Connection failed!');
+            Yii::error('Connection failed!', __METHOD__);
             return false;
         }
 
@@ -166,7 +166,7 @@ class LdapAuth
 
         $l = @ldap_connect($hostPrefix, $port);
         if (!$l) {
-            Yii::warning('Connect failed! ' . ldap_error($l), 'ldapAuth');
+            Yii::warning('Connect failed! ' . ldap_error($l), __METHOD__);
             return false;
         }
 
@@ -176,12 +176,12 @@ class LdapAuth
 
         $bind_dn = strpos($username, '@') === false ? $username . '@' . $domainData['name'] : $username;
 
-        Yii::debug('Trying to authenticate with DN ' . $bind_dn);
+        Yii::debug('Trying to authenticate with DN ' . $bind_dn, __METHOD__);
 
         $b = @ldap_bind($l, $bind_dn, $password);
 
         if (!$b) {
-            Yii::warning('Bind failed! ' . ldap_error($l), 'ldapAuth');
+            Yii::warning('Bind failed! ' . ldap_error($l), __METHOD__);
             return false;
         }
 
@@ -261,14 +261,18 @@ class LdapAuth
 
         $return = [];
         foreach ($domains as $domain) {
-            Yii::debug($domain, 'ldapAuth');
+            Yii::debug($domain, __METHOD__);
             if (!$this->login($domain['publicSearchUser'], $domain['publicSearchUserPassword'], $i)) {
-                throw new ErrorException('LDAP Connect or Bind error (' . ldap_errno($this->_l) . ' - ' . ldap_error($this->_l) . ') on ' . $domain['hostname']);
+                if (empty($this->_l)) {
+                    throw new ErrorException('LDAP Connect or Bind error on ' . $domain['hostname']);
+                } else {
+                    throw new ErrorException('LDAP Connect or Bind error (' . ldap_errno($this->_l) . ' - ' . ldap_error($this->_l) . ') on ' . $domain['hostname']);
+                }
             }
 
             $searchFilter = str_replace("%searchFor%", addslashes($searchFor), $searchFilter);
 
-            Yii::debug('Search-Filter: ' . $searchFilter);
+            Yii::debug('Search-Filter: ' . $searchFilter, __METHOD__);
 
             $result = ldap_search($this->_l, $this->_ldapBaseDn, $searchFilter, $attributes);
 
@@ -279,7 +283,7 @@ class LdapAuth
                         continue;
                     }
                     if (!isset($entry['objectsid'])) {
-                        Yii::warning('No objectsid! ignoring!');
+                        Yii::warning('No objectsid! ignoring!', __METHOD__);
                         continue;
                     }
                     $sid = self::SIDtoString($entry['objectsid'])[0];
@@ -290,7 +294,7 @@ class LdapAuth
                         // Check if this user is maybe already listed in the results - ifo so, determine which one is newer
                         foreach ($return as $_sid => $_data) {
                             if (!empty($_data['sidhistory']) && in_array($sid, $_data['sidhistory'])) {
-                                Yii::debug('This user is listed in another users history - skipping');
+                                Yii::debug('This user is listed in another users history - skipping', __METHOD__);
                                 continue 2;
                             }
                         }
@@ -298,7 +302,7 @@ class LdapAuth
                         if ($sidHistory) {
                             foreach ($sidHistory as $item) {
                                 if (array_key_exists($item, $return)) {
-                                    Yii::debug('User already exists with its sidhistory in results! Unsetting the old entry...');
+                                    Yii::debug('User already exists with its sidhistory in results! Unsetting the old entry...', __METHOD__);
                                     unset($return[$item]);
                                 }
                             }
@@ -315,6 +319,10 @@ class LdapAuth
                 }
             }
             $i++;
+
+            // Reset LDAP Link
+            ldap_close($this->_l);
+            $this->_l = null;
         }
 
         return empty($return) ? [] : $return;
