@@ -263,7 +263,7 @@ class LdapAuth
         foreach ($domains as $domain) {
             Yii::debug($domain, 'ldapAuth');
             if (!$this->login($domain['publicSearchUser'], $domain['publicSearchUserPassword'], $i)) {
-                throw new ErrorException('LDAP Connect or Bind error! Code: ' . ldap_errno($this->_l) . ' MSG: ' . ldap_error($this->_l));
+                throw new ErrorException('LDAP Connect or Bind error (' . ldap_errno($this->_l) . ' - ' . ldap_error($this->_l) . ') on ' . $domain['hostname']);
             }
 
             $searchFilter = str_replace("%searchFor%", addslashes($searchFor), $searchFilter);
