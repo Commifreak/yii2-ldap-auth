@@ -148,7 +148,7 @@ class LdapAuth
                     Yii::debug('.ldaprc file exists!', __METHOD__);
                 }
             } else {
-                Yii::debug("Not a windows environment!");
+                Yii::debug("Not a windows environment!", __METHOD__);
             }
 
             putenv('LDAPCONF=' . $ldaprcfile);
@@ -179,8 +179,12 @@ class LdapAuth
         ldap_set_option($l, LDAP_OPT_NETWORK_TIMEOUT, 3);
 
         if ($fetchUserDN) {
-            Yii::debug("We have to determine the user DN first!");
+            Yii::debug("We have to determine the user DN first!", __METHOD__);
             $userDNSearch = $this->searchUser($username, ['dn'], null, $domainKey);
+            if ($userDNSearch && count($userDNSearch) == 1 && isset($userDNSearch[0]['dn'])) {
+                Yii::debug("Overwrite username " . $username . " to " . $userDNSearch[0]['dn'], __METHOD__);
+                $username = $userDNSearch[0]['dn'];
+            }
         }
 
         $bind_dn = strpos($username, '@') === false && strpos($username, ',') === false ? $username . '@' . $domainData['name'] : $username;
@@ -259,23 +263,23 @@ class LdapAuth
         }
 
         if (is_int($autodetect)) {
-            Yii::debug("Static domainkey provided: " . $autodetect);
+            Yii::debug("Static domainkey provided: " . $autodetect, __METHOD__);
             if (!array_key_exists($autodetect, $this->domains)) {
                 throw new ErrorException("Provided domainKey does not exist!");
             }
             $domains = $this->domains[$autodetect];
         } else {
             if ($autodetect) {
-                Yii::debug("Domain auto detection used");
+                Yii::debug("Domain auto detection used", __METHOD__);
                 $autoDomain = $this->autoDetect();
             } else {
-                Yii::debug("Domain autodetect disabled, searching in ALL domains!");
+                Yii::debug("Domain autodetect disabled, searching in ALL domains!", __METHOD__);
                 $autoDomain = false;
             }
 
 
             if ($autodetect && $autoDomain === false) {
-                Yii::warning("Autodetect enabled but detection was not successful!");
+                Yii::warning("Autodetect enabled but detection was not successful!", __METHOD__);
                 return false;
             }
 
