@@ -184,6 +184,8 @@ class LdapAuth
             if ($userDNSearch && count($userDNSearch) == 1 && isset($userDNSearch[0]['dn'])) {
                 Yii::debug("Overwrite username " . $username . " to " . $userDNSearch[0]['dn'], __METHOD__);
                 $username = $userDNSearch[0]['dn'];
+            } else {
+                Yii::warning("Should overwrite username to DN, but something went wrong while finding the users DN. Leave it as is", __METHOD__);
             }
         }
 
