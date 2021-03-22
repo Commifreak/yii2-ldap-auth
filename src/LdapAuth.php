@@ -116,7 +116,7 @@ class LdapAuth
     }
 
 
-    public function login($username, $password, $domainKey)
+    public function login($username, $password, $domainKey, $fetchUserDN = false)
     {
 
         Yii::debug('Hello! :) Trying to log you in via LDAP!', __METHOD__);
@@ -135,16 +135,20 @@ class LdapAuth
              * TLS_REQCERT allow
              *
              */
-            $ldaprcfile = $_SERVER['HOME'] . '/.ldaprc';
+            if (isset($_SERVER['HOME']) && strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN') {
+                $ldaprcfile = $_SERVER['HOME'] . '/.ldaprc';
 
-            if (!file_exists($ldaprcfile)) {
-                // Try to create the file
-                if (!@file_put_contents($ldaprcfile, 'TLS_REQCERT allow')) {
-                    Yii::error('Cannot create required .ldaprc control file!', __METHOD__);
-                    return false;
+                if (!file_exists($ldaprcfile)) {
+                    // Try to create the file
+                    if (!@file_put_contents($ldaprcfile, 'TLS_REQCERT allow')) {
+                        Yii::error('Cannot create required .ldaprc control file!', __METHOD__);
+                        return false;
+                    }
+                } else {
+                    Yii::debug('.ldaprc file exists!', __METHOD__);
                 }
             } else {
-                Yii::debug('.ldaprc file exists!', __METHOD__);
+                Yii::debug("Not a windows environment!");
             }
 
             putenv('LDAPCONF=' . $ldaprcfile);
@@ -174,7 +178,12 @@ class LdapAuth
         ldap_set_option($l, LDAP_OPT_REFERRALS, 0);
         ldap_set_option($l, LDAP_OPT_NETWORK_TIMEOUT, 3);
 
-        $bind_dn = strpos($username, '@') === false ? $username . '@' . $domainData['name'] : $username;
+        if ($fetchUserDN) {
+            Yii::debug("We have to determine the user DN first!");
+            $userDNSearch = $this->searchUser($username, ['dn'], null, $domainKey);
+        }
+
+        $bind_dn = strpos($username, '@') === false && strpos($username, ',') === false ? $username . '@' . $domainData['name'] : $username;
 
         Yii::debug('Trying to authenticate with DN ' . $bind_dn, __METHOD__);
 
@@ -212,7 +221,11 @@ class LdapAuth
             if ($entries['count'] > 1 || $entries['count'] == 0) {
                 return false;
             }
-            $sid = self::SIDtoString($entries[0]['objectsid'])[0];
+            if (!isset($entry['objectsid'])) {
+                Yii::error('No objectsid!', __METHOD__);
+                return false;
+            }
+            $sid        = self::SIDtoString($entries[0]['objectsid'])[0];
             $sidHistory = isset($entries[0]['sidhistory']) ? self::SIDtoString($entries[0]['sidhistory']) : null;
             return array_merge(['sid' => $sid, 'sidhistory' => $sidHistory], self::handleEntry($entries[0]));
         } else {
@@ -224,7 +237,7 @@ class LdapAuth
      * @param $searchFor Search-Term
      * @param array $attributes Attributes to get back
      * @param string $searchFilter Filter string
-     * @param bool $autodetect Use autodetect to detect domain?
+     * @param bool $autodetect Use autodetect to detect domain? You can also provide integer domainkey, this is then used as target domain!
      * @return array|bool
      */
     public function searchUser($searchFor, $attributes = "", $searchFilter = "", $autodetect = true)
@@ -245,19 +258,30 @@ class LdapAuth
             $searchFilter = "(&(objectCategory=person)(|(objectSid=%searchFor%)(sIDHistory=%searchFor%)(samaccountname=*%searchFor%*)(mail=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)(l=%searchFor%)(physicalDeliveryOfficeName=%searchFor%)))";
         }
 
-        if ($autodetect) {
-            $autoDomain = $this->autoDetect();
+        if (is_int($autodetect)) {
+            Yii::debug("Static domainkey provided: " . $autodetect);
+            if (!array_key_exists($autodetect, $this->domains)) {
+                throw new ErrorException("Provided domainKey does not exist!");
+            }
+            $domains = $this->domains[$autodetect];
         } else {
-            $autoDomain = false;
+            if ($autodetect) {
+                Yii::debug("Domain auto detection used");
+                $autoDomain = $this->autoDetect();
+            } else {
+                Yii::debug("Domain autodetect disabled, searching in ALL domains!");
+                $autoDomain = false;
+            }
+
+
+            if ($autodetect && $autoDomain === false) {
+                Yii::warning("Autodetect enabled but detection was not successful!");
+                return false;
+            }
+
+            $domains = $autodetect ? [$this->domains[$autoDomain]] : $this->domains;
+            $i       = $autodetect ? $autoDomain : 0;
         }
-
-
-        if ($autodetect && $autoDomain === false) {
-            return false;
-        }
-
-        $domains = $autodetect ? [$this->domains[$autoDomain]] : $this->domains;
-        $i = $autodetect ? $autoDomain : 0;
 
         $return = [];
         foreach ($domains as $domain) {
