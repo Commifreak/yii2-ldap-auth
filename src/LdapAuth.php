@@ -81,6 +81,10 @@ class LdapAuth
     }
 
 
+    /**
+     * @param boolean $overrideIp If you want, you can pass a IP address instead using the autodetected one
+     * @return false|int
+     */
     public function autoDetect($overrideIp = false)
     {
 
@@ -116,6 +120,13 @@ class LdapAuth
     }
 
 
+    /**
+     * @param string $username The username to use
+     * @param string $password The users AD/LDAP password
+     * @param integer $domainKey The array key of the domain config to use
+     * @param boolean $fetchUserDN If true, determine users DN and use that as username
+     * @throws ErrorException
+     */
     public function login($username, $password, $domainKey, $fetchUserDN = false)
     {
 
@@ -200,15 +211,19 @@ class LdapAuth
             return false;
         }
 
-        $this->_l = $l;
+        $this->_l          = $l;
         $this->_ldapBaseDn = $domainData['baseDn'];
-        $this->_username = $username;
+        $this->_username   = $username;
 
         return true;
 
 
     }
 
+    /**
+     * @param array $attributes AD/LDAP attributes to return
+     * @return array|false
+     */
     public function fetchUserData($attributes = "")
     {
         if (empty($attributes)) {
@@ -240,10 +255,10 @@ class LdapAuth
     }
 
     /**
-     * @param $searchFor Search-Term
-     * @param array $attributes Attributes to get back
-     * @param string $searchFilter Filter string
-     * @param bool $autodetect Use autodetect to detect domain? You can also provide integer domainkey, this is then used as target domain!
+     * @param string $searchFor Search-Term
+     * @param array|null $attributes Attributes to get back
+     * @param string|null $searchFilter Filter string
+     * @param boolean $autodetect Use autodetect to detect domain? You can also provide integer domainkey, this is then used as target domain!
      * @return array|bool
      */
     public function searchUser($searchFor, $attributes = "", $searchFilter = "", $autodetect = true)
