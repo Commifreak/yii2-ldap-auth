@@ -264,7 +264,8 @@ class LdapAuth
     public function searchUser($searchFor, $attributes = "", $searchFilter = "", $autodetect = true)
     {
 
-        if (empty($searchFor)) {
+        if (empty($searchFor) && empty($searchFilter)) {
+            Yii::error("Search input and custom searchFilter are empty!", __METHOD__);
             return false;
         }
 
