@@ -279,13 +279,7 @@ class LdapAuth
             $searchFilter = "(&(objectCategory=person)(|(objectSid=%searchFor%)(sIDHistory=%searchFor%)(samaccountname=*%searchFor%*)(mail=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)(l=%searchFor%)(physicalDeliveryOfficeName=%searchFor%)))";
         }
 
-        if (is_int($autodetect)) {
-            Yii::debug("Static domainkey provided: " . $autodetect, __METHOD__);
-            if (!array_key_exists($autodetect, $this->domains)) {
-                throw new ErrorException("Provided domainKey does not exist!");
-            }
-            $domains = $this->domains[$autodetect];
-        } else {
+        if (is_bool($autodetect)) {
             if ($autodetect) {
                 Yii::debug("Domain auto detection used", __METHOD__);
                 $autoDomain = $this->autoDetect();
@@ -302,6 +296,12 @@ class LdapAuth
 
             $domains = $autodetect ? [$this->domains[$autoDomain]] : $this->domains;
             $i       = $autodetect ? $autoDomain : 0;
+        } else {
+            Yii::debug("Static domainkey provided: " . $autodetect, __METHOD__);
+            if (!array_key_exists($autodetect, $this->domains)) {
+                throw new ErrorException("Provided domainKey does not exist!");
+            }
+            $domains = $this->domains[$autodetect];
         }
 
         $return = [];
