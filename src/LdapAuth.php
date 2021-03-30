@@ -194,9 +194,12 @@ class LdapAuth
             $userDNSearch = $this->searchUser($username, ['dn'], null, $domainKey);
             Yii::debug("fetchUserDN: yes - Result:", __METHOD__);
             Yii::debug($userDNSearch, __METHOD__);
-            if ($userDNSearch && count($userDNSearch) == 1 && isset($userDNSearch[0]['dn'])) {
-                Yii::debug("Overwrite username " . $username . " to " . $userDNSearch[0]['dn'], __METHOD__);
-                $username = $userDNSearch[0]['dn'];
+
+            $firstArrayKey = !$userDNSearch ? false : array_key_first($userDNSearch);
+
+            if ($userDNSearch && count($userDNSearch) == 1 && $firstArrayKey) {
+                Yii::debug("Overwrite username " . $username . " to " . $userDNSearch[$firstArrayKey]['dn'], __METHOD__);
+                $username = $userDNSearch[$firstArrayKey]['dn'];
             } else {
                 Yii::warning("Should overwrite username to DN, but something went wrong while finding the users DN. Leave it as is", __METHOD__);
             }
