@@ -302,7 +302,7 @@ class LdapAuth
             if (!array_key_exists($autodetect, $this->domains)) {
                 throw new ErrorException("Provided domainKey does not exist!");
             }
-            $domains = $this->domains[$autodetect];
+            $domains = [$this->domains[$autodetect]];
         }
 
         $return = [];
