@@ -303,6 +303,7 @@ class LdapAuth
                 throw new ErrorException("Provided domainKey does not exist!");
             }
             $domains = [$this->domains[$autodetect]];
+            $i       = $autodetect;
         }
 
         $return = [];
