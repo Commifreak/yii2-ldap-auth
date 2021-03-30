@@ -192,6 +192,8 @@ class LdapAuth
         if ($fetchUserDN) {
             Yii::debug("We have to determine the user DN first!", __METHOD__);
             $userDNSearch = $this->searchUser($username, ['dn'], null, $domainKey);
+            Yii::debug("fetchUserDN: yes - Result:", __METHOD__);
+            Yii::debug($userDNSearch, __METHOD__);
             if ($userDNSearch && count($userDNSearch) == 1 && isset($userDNSearch[0]['dn'])) {
                 Yii::debug("Overwrite username " . $username . " to " . $userDNSearch[0]['dn'], __METHOD__);
                 $username = $userDNSearch[0]['dn'];
@@ -371,6 +373,9 @@ class LdapAuth
             ldap_close($this->_l);
             $this->_l = null;
         }
+
+        Yii::debug("Result:", __METHOD__);
+        Yii::debug($return, __METHOD__);
 
         return empty($return) ? [] : $return;
 
