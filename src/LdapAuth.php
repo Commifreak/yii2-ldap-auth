@@ -247,7 +247,7 @@ class LdapAuth
             if ($entries['count'] > 1 || $entries['count'] == 0) {
                 return false;
             }
-            if (!isset($entry['objectsid'])) {
+            if (!isset($entries[0]) && !isset($entries[0]['objectsid'])) {
                 Yii::error('No objectsid!', __METHOD__);
                 return false;
             }
