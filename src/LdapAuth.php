@@ -158,11 +158,11 @@ class LdapAuth
                 } else {
                     Yii::debug('.ldaprc file exists!', __METHOD__);
                 }
+                putenv('LDAPCONF=' . $ldaprcfile);
             } else {
                 Yii::debug("Not a windows environment!", __METHOD__);
             }
 
-            putenv('LDAPCONF=' . $ldaprcfile);
             putenv('LDAPTLS_REQCERT=allow');
             putenv('TLS_REQCERT=allow');
         }
