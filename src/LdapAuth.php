@@ -238,23 +238,35 @@ class LdapAuth
         array_push($attributes, 'objectSid'); # Push objectsid, regardless of source array, as we need it ALWAYS!
         array_push($attributes, 'sIDHistory'); # Push sIDHistory, regardless of source array, as we need it ALWAYS!
 
+        $baseDN        = $this->_ldapBaseDn;
         $search_filter = '(&(objectCategory=person)(samaccountname=' . $this->_username . '))';
 
-        $result = ldap_search($this->_l, $this->_ldapBaseDn, $search_filter, $attributes);
+        if (strpos(strtolower($this->_username), 'cn=') === 0) {
+            $baseDN        = $this->_username;
+            $search_filter = '(&(objectCategory=person))';
+        }
+
+        Yii::debug('[FetchUserData]: BaseDN: ' . $baseDN, __METHOD__);
+        Yii::debug('[FetchUserData]: Filter: ' . $search_filter, __METHOD__);
+
+
+        $result = ldap_search($this->_l, $baseDN, $search_filter, $attributes);
 
         if ($result) {
             $entries = ldap_get_entries($this->_l, $result);
             if ($entries['count'] > 1 || $entries['count'] == 0) {
+                Yii::error('[FetchUserData]: Found 0 or more than one result!', __METHOD__);
                 return false;
             }
             if (!isset($entries[0]) && !isset($entries[0]['objectsid'])) {
-                Yii::error('No objectsid!', __METHOD__);
+                Yii::error('[FetchUserData]: No objectsid!', __METHOD__);
                 return false;
             }
             $sid        = self::SIDtoString($entries[0]['objectsid'])[0];
             $sidHistory = isset($entries[0]['sidhistory']) ? self::SIDtoString($entries[0]['sidhistory']) : null;
             return array_merge(['sid' => $sid, 'sidhistory' => $sidHistory], self::handleEntry($entries[0]));
         } else {
+            Yii::error('[FetchUserData]: Search failed: ' . ldap_error($this->_l), __METHOD__);
             return false;
         }
     }
