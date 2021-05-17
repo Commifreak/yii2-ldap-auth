@@ -92,11 +92,11 @@ class LdapAuth
             return 0;
         }
 
-        $clientIp = $overrideIp ? $overrideIp : (isset($_SERVER['HTTP_X_FORWARDED_FOR']) ? $_SERVER['HTTP_X_FORWARDED_FOR'] : (isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : null));
+        $clientIp = $overrideIp ? $overrideIp : Yii::$app->request->getUserIP();
 
         if (empty($clientIp)) {
             Yii::debug('[Autodetect] No client ip detected, skipping auto detection', __METHOD__);
-            return 0;
+            return false;
         }
 
         $index = 0;
