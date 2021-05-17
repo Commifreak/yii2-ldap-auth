@@ -88,11 +88,18 @@ class LdapAuth
     public function autoDetect($overrideIp = false)
     {
 
+        Yii::debug('[Autodetect] Started IP autodetection!', __METHOD__);
+
         if (count($this->domains) <= 1) {
+            Yii::debug('[Autodetect] No autodetection needed: Only one domain configured!', __METHOD__);
             return 0;
         }
 
+        Yii::debug('[Autodetect] ' . ($overrideIp ? 'OverrideIp set!' : 'No override IP set!'), __METHOD__);
+
         $clientIp = $overrideIp ? $overrideIp : Yii::$app->request->getUserIP();
+
+        Yii::debug('[Autodetect] Detected IP: ' . $clientIp, __METHOD__);
 
         if (empty($clientIp)) {
             Yii::debug('[Autodetect] No client ip detected, skipping auto detection', __METHOD__);
