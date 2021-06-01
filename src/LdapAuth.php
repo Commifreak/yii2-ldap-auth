@@ -66,7 +66,7 @@ class LdapAuth extends BaseObject
         if ($autoDetectDomainKey) {
             Yii::debug("AutoDetected domain: #" . $autoDetectDomainKey, __METHOD__);
             unset($domains[$autoDetectDomainKey]);
-            $domains       = [$this->domains[$autoDetectDomainKey]] + $domains;
+            $domains       = array_merge([$this->domains[$autoDetectDomainKey]], $domains);
             $this->domains = $domains;
         } else {
             Yii::debug('AutoDetect was not successful!', __METHOD__);
@@ -162,7 +162,7 @@ class LdapAuth extends BaseObject
                 throw new InvalidArgumentException("The domainkey is invalid!");
             }
             Yii::debug("Using domain #" . $domainKey, __METHOD__);
-            $domains = [$this->domains[$domainKey]];
+            $domains = [$domainKey => $this->domains[$domainKey]];
         }
 
         foreach ($domains as $domainKey => $domainData) {
@@ -311,10 +311,10 @@ class LdapAuth extends BaseObject
      * @param string $searchFor Search-Term
      * @param array|null $attributes Attributes to get back
      * @param string|null $searchFilter Filter string
-     * @param boolean $autodetect Use autodetect to detect domain? You can also provide integer domainkey, this is then used as target domain!
+     * @param integer $domainKey You can provide integer domainkey, this is then used as target domain! Otherwise it searches in all domains
      * @return array|bool
      */
-    public function searchUser($searchFor, $attributes = "", $searchFilter = "", $autodetect = true)
+    public function searchUser($searchFor, $attributes = "", $searchFilter = "", $domainKey = false)
     {
 
         if (empty($searchFor) && empty($searchFilter)) {
@@ -335,21 +335,17 @@ class LdapAuth extends BaseObject
 
         // Default set
         $domains = $this->domains;
-        $i       = 0;
 
-        if (is_bool($autodetect)) {
-            Yii::error("OLD CONFIGURATION: Please adjust searchUser Param #4 to be an integer, providing the static domain or do not set it (autodetect by default)!", __METHOD__);
-        } else {
-            Yii::debug("Static domainkey provided: " . $autodetect, __METHOD__);
-            if (!array_key_exists($autodetect, $this->domains)) {
+        if (is_int($domainKey)) {
+            Yii::debug("Static domainkey provided: " . $domainKey, __METHOD__);
+            if (!array_key_exists($domainKey, $this->domains)) {
                 throw new ErrorException("Provided domainKey does not exist!");
             }
-            $domains = [$this->domains[$autodetect]];
-            $i       = $autodetect;
+            $domains = [$domainKey => $this->domains[$domainKey]];
         }
 
         $return = [];
-        foreach ($domains as $domain) {
+        foreach ($domains as $i => $domain) {
             Yii::debug($domain, __METHOD__);
             if (!$this->login($domain['publicSearchUser'], $domain['publicSearchUserPassword'], $i)) {
                 if (empty($this->_l)) {
