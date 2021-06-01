@@ -141,8 +141,18 @@ class LdapAuth
         Yii::debug('Hello! :) Trying to log you in via LDAP!', __METHOD__);
 
         if ($domainKey === false) {
-            Yii::debug("Using all domains", __METHOD__);
+            Yii::debug("Using all domains - trying to autoDetect, to find high prio domain.", __METHOD__);
             $domains = $this->domains;
+
+            $autoDetectDomainKey = $this->autoDetect();
+
+            if ($autoDetectDomainKey) {
+                Yii::debug("AutoDetected domain: #" . $autoDetectDomainKey, __METHOD__);
+                unset($domains[$autoDetectDomainKey]);
+                $domains = $this->domains[$autoDetectDomainKey] + $domains;
+            } else {
+                Yii::debug('AutoDetect was not successful!', __METHOD__);
+            }
         } else {
             if (!isset($this->domains[$domainKey])) {
                 throw new InvalidArgumentException("The domainkey is invalid!");
