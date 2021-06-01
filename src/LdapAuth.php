@@ -11,6 +11,7 @@ namespace commifreak\yii2;
 use Yii;
 use yii\base\ErrorException;
 use yii\base\Exception;
+use yii\base\InvalidArgumentException;
 use yii\helpers\IpHelper;
 
 class LdapAuth
@@ -130,7 +131,7 @@ class LdapAuth
     /**
      * @param string $username The username to use
      * @param string $password The users AD/LDAP password
-     * @param integer $domainKey The array key of the domain config to use
+     * @param integer|false $domainKey The array key of the domain config to use. False to try every single domain
      * @param boolean $fetchUserDN If true, determine users DN and use that as username
      * @throws ErrorException
      */
@@ -139,96 +140,110 @@ class LdapAuth
 
         Yii::debug('Hello! :) Trying to log you in via LDAP!', __METHOD__);
 
+        if ($domainKey === false) {
+            Yii::debug("Using all domains", __METHOD__);
+            $domains = $this->domains;
+        } else {
+            if (!isset($this->domains[$domainKey])) {
+                throw new InvalidArgumentException("The domainkey is invalid!");
+            }
+            Yii::debug("Using domain #" . $domainKey, __METHOD__);
+            $domains = [$this->domains[$domainKey]];
+        }
 
-        $domainData = $this->domains[$domainKey];
+        foreach ($domains as $domainData) {
 
-        $ssl = isset($domainData['useSSL']) && $domainData['useSSL'];
-        Yii::debug('Use SSL here? ' . ($ssl ? 'Yes' : 'No'), __METHOD__);
+            Yii::debug("Processing domain " . $domainData['hostname'], __METHOD__);
 
-        if ($ssl) {
-            // When using SSL, we have to set some env variables and create an ldap controlfile - otherwirse a connect with non valid certificat will fail!
+            $ssl = isset($domainData['useSSL']) && $domainData['useSSL'];
+            Yii::debug('Use SSL here? ' . ($ssl ? 'Yes' : 'No'), __METHOD__);
 
-            /**
-             * Inhalt der .ldaprc:
-             * TLS_REQCERT allow
-             *
-             */
-            if (isset($_SERVER['HOME']) && strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN') {
-                $ldaprcfile = $_SERVER['HOME'] . '/.ldaprc';
+            if ($ssl) {
+                // When using SSL, we have to set some env variables and create an ldap controlfile - otherwirse a connect with non valid certificat will fail!
 
-                if (!file_exists($ldaprcfile)) {
-                    // Try to create the file
-                    if (!@file_put_contents($ldaprcfile, 'TLS_REQCERT allow')) {
-                        Yii::error('Cannot create required .ldaprc control file!', __METHOD__);
-                        return false;
+                /**
+                 * Inhalt der .ldaprc:
+                 * TLS_REQCERT allow
+                 *
+                 */
+                if (isset($_SERVER['HOME']) && strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN') {
+                    $ldaprcfile = $_SERVER['HOME'] . '/.ldaprc';
+
+                    if (!file_exists($ldaprcfile)) {
+                        // Try to create the file
+                        if (!@file_put_contents($ldaprcfile, 'TLS_REQCERT allow')) {
+                            Yii::error('Cannot create required .ldaprc control file!', __METHOD__);
+                            continue;
+                        }
+                    } else {
+                        Yii::debug('.ldaprc file exists!', __METHOD__);
                     }
+                    putenv('LDAPCONF=' . $ldaprcfile);
                 } else {
-                    Yii::debug('.ldaprc file exists!', __METHOD__);
+                    Yii::debug("Not a windows environment!", __METHOD__);
                 }
-                putenv('LDAPCONF=' . $ldaprcfile);
-            } else {
-                Yii::debug("Not a windows environment!", __METHOD__);
+
+                putenv('LDAPTLS_REQCERT=allow');
+                putenv('TLS_REQCERT=allow');
             }
 
-            putenv('LDAPTLS_REQCERT=allow');
-            putenv('TLS_REQCERT=allow');
-        }
+            Yii::debug('Trying to connect to Domain #' . $domainKey . ' (' . $domainData['hostname'] . ')', __METHOD__);
 
-        Yii::debug('Trying to connect to Domain #' . $domainKey . ' (' . $domainData['hostname'] . ')', __METHOD__);
-
-        if (!self::serviceping($domainData['hostname'], $ssl ? 636 : null)) {
-            Yii::error('Connection failed!', __METHOD__);
-            return false;
-        }
-
-        $hostPrefix = ($ssl ? 'ldaps://' : 'ldap://') . $domainData['hostname'];
-        $port = $ssl ? 636 : 389;
-
-        Yii::debug('Connecting to ' . $hostPrefix . ', Port: ' . $port, __METHOD__);
-
-        $l = @ldap_connect($hostPrefix, $port);
-        if (!$l) {
-            Yii::warning('Connect failed! ' . ldap_error($l), __METHOD__);
-            return false;
-        }
-
-        ldap_set_option($l, LDAP_OPT_PROTOCOL_VERSION, 3);
-        ldap_set_option($l, LDAP_OPT_REFERRALS, 0);
-        ldap_set_option($l, LDAP_OPT_NETWORK_TIMEOUT, 3);
-
-        if ($fetchUserDN) {
-            Yii::debug("We have to determine the user DN first!", __METHOD__);
-            $userDNSearch = $this->searchUser($username, ['dn'], null, $domainKey);
-            Yii::debug("fetchUserDN: yes - Result:", __METHOD__);
-            Yii::debug($userDNSearch, __METHOD__);
-
-            $firstArrayKey = !$userDNSearch ? false : array_key_first($userDNSearch);
-
-            if ($userDNSearch && count($userDNSearch) == 1 && $firstArrayKey) {
-                Yii::debug("Overwrite username " . $username . " to " . $userDNSearch[$firstArrayKey]['dn'], __METHOD__);
-                $username = $userDNSearch[$firstArrayKey]['dn'];
-            } else {
-                Yii::warning("Should overwrite username to DN, but something went wrong while finding the users DN. Leave it as is", __METHOD__);
+            if (!self::serviceping($domainData['hostname'], $ssl ? 636 : null)) {
+                Yii::error('Connection failed!', __METHOD__);
+                continue;
             }
+
+            $hostPrefix = ($ssl ? 'ldaps://' : 'ldap://') . $domainData['hostname'];
+            $port       = $ssl ? 636 : 389;
+
+            Yii::debug('Connecting to ' . $hostPrefix . ', Port: ' . $port, __METHOD__);
+
+            $l = @ldap_connect($hostPrefix, $port);
+            if (!$l) {
+                Yii::warning('Connect failed! ' . ldap_error($l), __METHOD__);
+                continue;
+            }
+
+            ldap_set_option($l, LDAP_OPT_PROTOCOL_VERSION, 3);
+            ldap_set_option($l, LDAP_OPT_REFERRALS, 0);
+            ldap_set_option($l, LDAP_OPT_NETWORK_TIMEOUT, 3);
+
+            if ($fetchUserDN) {
+                Yii::debug("We have to determine the user DN first!", __METHOD__);
+                $userDNSearch = $this->searchUser($username, ['dn'], null, $domainKey);
+                Yii::debug("fetchUserDN: yes - Result:", __METHOD__);
+                Yii::debug($userDNSearch, __METHOD__);
+
+                $firstArrayKey = !$userDNSearch ? false : array_key_first($userDNSearch);
+
+                if ($userDNSearch && count($userDNSearch) == 1 && $firstArrayKey) {
+                    Yii::debug("Overwrite username " . $username . " to " . $userDNSearch[$firstArrayKey]['dn'], __METHOD__);
+                    $username = $userDNSearch[$firstArrayKey]['dn'];
+                } else {
+                    Yii::warning("Should overwrite username to DN, but something went wrong while finding the users DN. Leave it as is", __METHOD__);
+                }
+            }
+
+            $bind_dn = strpos($username, '@') === false && strpos($username, ',') === false ? $username . '@' . $domainData['name'] : $username;
+
+            Yii::debug('Trying to authenticate with DN ' . $bind_dn, __METHOD__);
+
+            $b = @ldap_bind($l, $bind_dn, $password);
+
+            if (!$b) {
+                Yii::warning('Bind failed! ' . ldap_error($l), __METHOD__);
+                continue;
+            }
+
+            $this->_l          = $l;
+            $this->_ldapBaseDn = $domainData['baseDn'];
+            $this->_username   = $username;
+
+            return true;
         }
 
-        $bind_dn = strpos($username, '@') === false && strpos($username, ',') === false ? $username . '@' . $domainData['name'] : $username;
-
-        Yii::debug('Trying to authenticate with DN ' . $bind_dn, __METHOD__);
-
-        $b = @ldap_bind($l, $bind_dn, $password);
-
-        if (!$b) {
-            Yii::warning('Bind failed! ' . ldap_error($l), __METHOD__);
-            return false;
-        }
-
-        $this->_l          = $l;
-        $this->_ldapBaseDn = $domainData['baseDn'];
-        $this->_username   = $username;
-
-        return true;
-
+        return false;
 
     }
 
