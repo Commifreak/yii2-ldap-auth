@@ -54,6 +54,9 @@ There are 4 basic functions:
   * Tries to detect the User's client IP (with Proxy support) and determines the Domain to use
 * `login($username, $password, $domainKey, $fetchUserDN)`
   * Tries to connect to domain and bind to it as `$username` with `$password`
+  * `$domainKey` defines the domain to use (either detected by `autoDetect` or by passing the key number of the
+    configuration array)
+    * If you set it to `false`, the login function loops through every domain and tries to log you in.
   * `$fetchUserDN` determines the user DN, in case you want a bind via a users DN instead of username@hostname
 * `fetchUserData($attributes)`
   * Queries the LDAP for the logged in user and gets some attributes (adjustable list of attributes)
