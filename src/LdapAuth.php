@@ -149,7 +149,7 @@ class LdapAuth
             if ($autoDetectDomainKey) {
                 Yii::debug("AutoDetected domain: #" . $autoDetectDomainKey, __METHOD__);
                 unset($domains[$autoDetectDomainKey]);
-                $domains = $this->domains[$autoDetectDomainKey] + $domains;
+                $domains = [$this->domains[$autoDetectDomainKey]] + $domains;
             } else {
                 Yii::debug('AutoDetect was not successful!', __METHOD__);
             }
