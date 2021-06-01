@@ -151,7 +151,7 @@ class LdapAuth
             $domains = [$this->domains[$domainKey]];
         }
 
-        foreach ($domains as $domainData) {
+        foreach ($domains as $domainKey => $domainData) {
 
             Yii::debug("Processing domain " . $domainData['hostname'], __METHOD__);
 
