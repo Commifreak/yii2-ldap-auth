@@ -149,7 +149,7 @@ class LdapAuth extends BaseObject
      * @param boolean $fetchUserDN If true, determine users DN and use that as username
      * @throws ErrorException
      */
-    public function login($username, $password, $domainKey, $fetchUserDN = false)
+    public function login($username, $password, $domainKey = false, $fetchUserDN = false)
     {
 
         Yii::debug('Hello! :) Trying to log you in via LDAP!', __METHOD__);
