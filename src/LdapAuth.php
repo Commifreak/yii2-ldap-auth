@@ -57,6 +57,20 @@ class LdapAuth
             throw new Exception("LDAP-extension missing :(");
         }
 
+        // Sort the domains one time for this run!
+        $autoDetectDomainKey = $this->autoDetect();
+
+        $domains = $this->domains;
+
+        if ($autoDetectDomainKey) {
+            Yii::debug("AutoDetected domain: #" . $autoDetectDomainKey, __METHOD__);
+            unset($domains[$autoDetectDomainKey]);
+            $domains       = [$this->domains[$autoDetectDomainKey]] + $domains;
+            $this->domains = $domains;
+        } else {
+            Yii::debug('AutoDetect was not successful!', __METHOD__);
+        }
+
     }
 
     // Thanks to: https://www.php.net/manual/de/function.ldap-connect.php#115662
@@ -141,18 +155,8 @@ class LdapAuth
         Yii::debug('Hello! :) Trying to log you in via LDAP!', __METHOD__);
 
         if ($domainKey === false) {
-            Yii::debug("Using all domains - trying to autoDetect, to find high prio domain.", __METHOD__);
+            Yii::debug("Using all domains", __METHOD__);
             $domains = $this->domains;
-
-            $autoDetectDomainKey = $this->autoDetect();
-
-            if ($autoDetectDomainKey) {
-                Yii::debug("AutoDetected domain: #" . $autoDetectDomainKey, __METHOD__);
-                unset($domains[$autoDetectDomainKey]);
-                $domains = [$this->domains[$autoDetectDomainKey]] + $domains;
-            } else {
-                Yii::debug('AutoDetect was not successful!', __METHOD__);
-            }
         } else {
             if (!isset($this->domains[$domainKey])) {
                 throw new InvalidArgumentException("The domainkey is invalid!");
@@ -329,23 +333,11 @@ class LdapAuth
             $searchFilter = "(&(objectCategory=person)(|(objectSid=%searchFor%)(sIDHistory=%searchFor%)(samaccountname=*%searchFor%*)(mail=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)(l=%searchFor%)(physicalDeliveryOfficeName=%searchFor%)))";
         }
 
+        // Default set
+        $domains = $this->domains;
+
         if (is_bool($autodetect)) {
-            if ($autodetect) {
-                Yii::debug("Domain auto detection used", __METHOD__);
-                $autoDomain = $this->autoDetect();
-            } else {
-                Yii::debug("Domain autodetect disabled, searching in ALL domains!", __METHOD__);
-                $autoDomain = false;
-            }
-
-
-            if ($autodetect && $autoDomain === false) {
-                Yii::warning("Autodetect enabled but detection was not successful!", __METHOD__);
-                return false;
-            }
-
-            $domains = $autodetect ? [$this->domains[$autoDomain]] : $this->domains;
-            $i       = $autodetect ? $autoDomain : 0;
+            Yii::error("OLD CONFIGURATION: Please adjust searchUser Param #4 to be an integer, providing the static domain or do not set it (autodetect by default)!", __METHOD__);
         } else {
             Yii::debug("Static domainkey provided: " . $autodetect, __METHOD__);
             if (!array_key_exists($autodetect, $this->domains)) {
