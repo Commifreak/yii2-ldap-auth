@@ -335,6 +335,7 @@ class LdapAuth
 
         // Default set
         $domains = $this->domains;
+        $i       = 0;
 
         if (is_bool($autodetect)) {
             Yii::error("OLD CONFIGURATION: Please adjust searchUser Param #4 to be an integer, providing the static domain or do not set it (autodetect by default)!", __METHOD__);
