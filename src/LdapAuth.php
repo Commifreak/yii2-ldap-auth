@@ -225,7 +225,7 @@ class LdapAuth extends BaseObject
 
             if ($fetchUserDN) {
                 Yii::debug("We have to determine the user DN first!", __METHOD__);
-                $userDNSearch = $this->searchUser($username, ['dn'], null, $domainKey);
+                $userDNSearch = $this->searchUser($username, ['dn'], null, $domainKey, true);
                 Yii::debug("fetchUserDN: yes - Result:", __METHOD__);
                 Yii::debug($userDNSearch, __METHOD__);
 
@@ -314,7 +314,7 @@ class LdapAuth extends BaseObject
      * @param integer $domainKey You can provide integer domainkey, this is then used as target domain! Otherwise it searches in all domains
      * @return array|bool
      */
-    public function searchUser($searchFor, $attributes = "", $searchFilter = "", $domainKey = false)
+    public function searchUser($searchFor, $attributes = "", $searchFilter = "", $domainKey = false, $onlyActiveAccounts = false)
     {
 
         if (empty($searchFor) && empty($searchFilter)) {
@@ -329,8 +329,14 @@ class LdapAuth extends BaseObject
         array_push($attributes, 'objectSid'); # Push objectsid, regardless of source array, as we need it ALWAYS!
         array_push($attributes, 'sIDHistory'); # Push sIDHistory, regardless of source array, as we need it ALWAYS!
 
+        $onlyActive = '';
+
+        if ($onlyActiveAccounts) {
+            $onlyActive = '(!(userAccountControl=2))(!(userAccountControl=16))(!(userAccountControl=514))'; // 2 & 514: deactivated, 16: locked
+        }
+
         if (empty($searchFilter)) {
-            $searchFilter = "(&(objectCategory=person)(|(objectSid=%searchFor%)(sIDHistory=%searchFor%)(samaccountname=*%searchFor%*)(mail=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)(l=%searchFor%)(physicalDeliveryOfficeName=%searchFor%)))";
+            $searchFilter = "(&(objectCategory=person)" . $onlyActive . "(|(objectSid=%searchFor%)(sIDHistory=%searchFor%)(samaccountname=*%searchFor%*)(mail=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)(l=%searchFor%)(physicalDeliveryOfficeName=%searchFor%)))";
         }
 
         // Default set
