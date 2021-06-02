@@ -61,12 +61,14 @@ There are 4 basic functions:
   * `$fetchUserDN` determines the user DN, in case you want a bind via a users DN instead of username@hostname
 * `fetchUserData($attributes)`
   * Queries the LDAP for the logged in user and gets some attributes (adjustable list of attributes)
-* `searchUser($searchFor, $attributes, $searchFilter, $domainKey)`
+* `searchUser($searchFor, $attributes, $searchFilter, $domainKey, $onlyActiveAccounts)`
   * Searches for a user in the LDAP-Directory. This requires a search-user which is configured in the component options.
   * The options let you define what attributes you want back and in which you are searching (defaults to lastname,
     firstname, username and class=person).
   * `$domainKey` lets you set a fixed domain (from autoDetect as example) to search. Otherwise, it searches in every
     domain
+  * `$onlyActiveAccounts` lets you decide whether you only want active or all accounts to be returned. defaults to
+    false!
 
 ## Example
 
