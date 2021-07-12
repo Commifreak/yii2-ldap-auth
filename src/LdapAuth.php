@@ -355,10 +355,11 @@ class LdapAuth extends BaseObject
             Yii::debug($domain, __METHOD__);
             if (!$this->login($domain['publicSearchUser'], $domain['publicSearchUserPassword'], $i)) {
                 if (empty($this->_l)) {
-                    throw new ErrorException('LDAP Connect or Bind error on ' . $domain['hostname']);
+                    Yii::error('LDAP Connect or Bind error on ' . $domain['hostname'] . ', skipping...', __METHOD__);
                 } else {
-                    throw new ErrorException('LDAP Connect or Bind error (' . ldap_errno($this->_l) . ' - ' . ldap_error($this->_l) . ') on ' . $domain['hostname']);
+                    Yii::error('LDAP Connect or Bind error (' . ldap_errno($this->_l) . ' - ' . ldap_error($this->_l) . ') on ' . $domain['hostname'] . ', skipping...');
                 }
+                continue; // Skip the whole domain
             }
 
             $searchFilter = str_replace("%searchFor%", addslashes($searchFor), $searchFilter);
