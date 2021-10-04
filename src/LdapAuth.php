@@ -332,7 +332,7 @@ class LdapAuth extends BaseObject
         $onlyActive = '';
 
         if ($onlyActiveAccounts) {
-            $onlyActive = '(!(userAccountControl=2))(!(userAccountControl=16))(!(userAccountControl=514))'; // 2 & 514: deactivated, 16: locked
+            $onlyActive = '(|(userAccountControl=16)(userAccountControl=512)(userAccountControl=544)(userAccountControl=66048))'; #https://www.der-windows-papst.de/2016/12/18/active-directory-useraccountcontrol-values/
         }
 
         if (empty($searchFilter)) {
@@ -359,57 +359,76 @@ class LdapAuth extends BaseObject
                 } else {
                     Yii::error('LDAP Connect or Bind error (' . ldap_errno($this->_l) . ' - ' . ldap_error($this->_l) . ') on ' . $domain['hostname'] . ', skipping...');
                 }
-                continue; // Skip the whole domain
             }
 
             $searchFilter = str_replace("%searchFor%", addslashes($searchFor), $searchFilter);
 
             Yii::debug('Search-Filter: ' . $searchFilter, __METHOD__);
 
-            $result = ldap_search($this->_l, $this->_ldapBaseDn, $searchFilter, $attributes);
+            $cookie = '';
 
-            if ($result) {
-                $entries = ldap_get_entries($this->_l, $result);
-                foreach ($entries as $entry) {
-                    if (!is_array($entry) || empty($entry)) {
-                        continue;
-                    }
-                    if (!isset($entry['objectsid'])) {
-                        Yii::warning('No objectsid! ignoring!', __METHOD__);
-                        continue;
-                    }
-                    $sid = self::SIDtoString($entry['objectsid'])[0];
-                    $sidHistory = isset($entry['sidhistory']) ? self::SIDtoString($entry['sidhistory']) : null;
+            do {
+                $result = @ldap_search($this->_l, $this->_ldapBaseDn, $searchFilter, $attributes, 0, 0, 0, LDAP_DEREF_NEVER, [
+                    ['oid' => LDAP_CONTROL_PAGEDRESULTS, 'value' => ['size' => 500, 'cookie' => $cookie]]
+                ]);
+                ldap_parse_result($this->_l, $result, $errcode, $matcheddn, $errmsg, $referrals, $controls);
 
 
-                    if ($this->filterBySidhistory) {
-                        // Check if this user is maybe already listed in the results - ifo so, determine which one is newer
-                        foreach ($return as $_sid => $_data) {
-                            if (!empty($_data['sidhistory']) && in_array($sid, $_data['sidhistory'])) {
-                                Yii::debug('This user is listed in another users history - skipping', __METHOD__);
-                                continue 2;
-                            }
+                if ($result) {
+                    $entries = ldap_get_entries($this->_l, $result);
+                    Yii::debug('Found entries: ' . ($entries ? count($entries) : '0'), __FUNCTION__);
+                    foreach ($entries as $entry) {
+                        if (!is_array($entry) || empty($entry)) {
+                            continue;
                         }
+                        if (!isset($entry['objectsid'])) {
+                            Yii::warning('No objectsid! ignoring!', __METHOD__);
+                            continue;
+                        }
+                        $sid        = self::SIDtoString($entry['objectsid'])[0];
+                        $sidHistory = isset($entry['sidhistory']) ? self::SIDtoString($entry['sidhistory']) : null;
 
-                        if ($sidHistory) {
-                            foreach ($sidHistory as $item) {
-                                if (array_key_exists($item, $return)) {
-                                    Yii::debug('User already exists with its sidhistory in results! Unsetting the old entry...', __METHOD__);
-                                    unset($return[$item]);
+
+                        if ($this->filterBySidhistory) {
+                            // Check if this user is maybe already listed in the results - ifo so, determine which one is newer
+                            foreach ($return as $_sid => $_data) {
+                                if (!empty($_data['sidhistory']) && in_array($sid, $_data['sidhistory'])) {
+                                    Yii::debug('This user is listed in another users history - skipping', __METHOD__);
+                                    continue 2;
+                                }
+                            }
+
+                            if ($sidHistory) {
+                                foreach ($sidHistory as $item) {
+                                    if (array_key_exists($item, $return)) {
+                                        Yii::debug('User already exists with its sidhistory in results! Unsetting the old entry...', __METHOD__);
+                                        unset($return[$item]);
+                                    }
                                 }
                             }
                         }
-                    }
 
 
-                    $additionalData = ['sid' => $sid, 'sidhistory' => $sidHistory, 'dn' => $entry['dn'], 'domainKey' => $i];
-                    if (count($this->domains) > 1) {
-                        // Enable domainName output if more than one domains configured
-                        $additionalData['domainName'] = $this->domains[$i]['name'];
+                        $additionalData = ['sid' => $sid, 'sidhistory' => $sidHistory, 'dn' => $entry['dn'], 'domainKey' => $i];
+                        if (count($this->domains) > 1) {
+                            // Enable domainName output if more than one domains configured
+                            $additionalData['domainName'] = $this->domains[$i]['name'];
+                        }
+                        $return[$sid] = array_merge($additionalData, self::handleEntry($entry));
                     }
-                    $return[$sid] = array_merge($additionalData, self::handleEntry($entry));
                 }
-            }
+
+
+                if (isset($controls[LDAP_CONTROL_PAGEDRESULTS]['value']['cookie'])) {
+                    // You need to pass the cookie from the last call to the next one
+                    $cookie = $controls[LDAP_CONTROL_PAGEDRESULTS]['value']['cookie'];
+                } else {
+                    $cookie = '';
+                }
+                // Empty cookie means last page
+            } while (!empty($cookie));
+
+
             $i++;
 
             // Reset LDAP Link
@@ -459,7 +478,7 @@ class LdapAuth extends BaseObject
             if (is_int($attr) || $attr == 'objectsid' || $attr == 'sidhistory' || !isset($value['count'])) {
                 continue;
             }
-            $count = $value['count'];
+            $count  = $value['count'];
             $newVal = "";
             for ($i = 0; $i < $count; $i++) {
                 $newVal .= $value[$i];
