@@ -48,7 +48,7 @@ __Attention!__ You need to define `baseDn`. This defines the baseDN in where the
 
 ## Usage
 
-There are 4 basic functions:
+There are 5 basic functions:
 
 * `autoDetect($overrideIp)`
   * Tries to detect the User's client IP (with Proxy support) and determines the Domain to use
@@ -69,6 +69,9 @@ There are 4 basic functions:
     domain
   * `$onlyActiveAccounts` lets you decide whether you only want active or all accounts to be returned. defaults to
     false!
+* `updateAttributes` lets you update the user attributes
+  * `$attributes` The attribute (array keys are the attribute names, the array values are the attribute values)
+  * `$dn` The DN which should be updated - if not provided, the eventually previous examined one will be used.
 
 ## Example
 
@@ -142,15 +145,41 @@ public function login()
 
 This also tries to sync user's data with the LDAP.
 
+### User attribute update
+
+```php
+/** @var LdapAuth $ldap */
+$ldap = \Yii::$app->ldap;
+
+if (!$ldap->login(\Yii::$app->user->identity->sid, $this->userPassword, false, true)) {
+    return false;
+}
+
+$updateAttrs = [];
+
+if (!empty($this->phone)) {
+    $updateAttrs['telephonenumber'] = $this->phone;
+}
+
+if (!empty($this->room)) {
+    $updateAttrs['physicaldeliveryofficename'] = $this->room;
+}
+
+if (!$ldap->updateAttributes($updateAttrs)) {
+    return false;
+}
+```
+
 ## The database
 
 I've added/changed the user table as follow, to add a sid, firstname, lastname and phone column:
 
 ```sql
-CREATE TABLE `user` (
-  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `sid` varchar(255) DEFAULT NULL,
-  `email` varchar(256) NOT NULL,
+CREATE TABLE `user`
+(
+  `id`             int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `sid`            varchar(255) DEFAULT NULL,
+  `email`          varchar(256) NOT NULL,
   `firstname` varchar(255) DEFAULT NULL,
   `lastname` varchar(255) DEFAULT NULL,
   `phone` varchar(255) DEFAULT NULL,
