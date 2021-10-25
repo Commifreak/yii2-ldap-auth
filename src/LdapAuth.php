@@ -49,6 +49,7 @@ class LdapAuth extends BaseObject
     private $_ldapBaseDn;
     private $_l;
     private $_username;
+    private $_curDn;
 
     public function init()
     {
@@ -145,14 +146,33 @@ class LdapAuth extends BaseObject
     /**
      * @param string $username The username to use
      * @param string $password The users AD/LDAP password
-     * @param integer|false $domainKey The array key of the domain config to use. False to try every single domain
+     * @param integer|false $domainKey The array key of the domain config to use. False to try every single domain. HAS NO EFFECT IF $fetchUserDn IS TRUE!
      * @param boolean $fetchUserDN If true, determine users DN and use that as username
+     * @return bool True on success, false on failure.
      * @throws ErrorException
      */
     public function login($username, $password, $domainKey = false, $fetchUserDN = false)
     {
 
         Yii::debug('Hello! :) Trying to log you in via LDAP!', __METHOD__);
+
+        if ($fetchUserDN) {
+            Yii::debug("We have to determine the user DN first!", __METHOD__);
+            $userDNSearch = $this->searchUser($username, ['dn'], null, $domainKey, true);
+            Yii::debug("fetchUserDN: yes - Result:", __METHOD__);
+            Yii::debug($userDNSearch, __METHOD__);
+
+            $firstArrayKey = !$userDNSearch ? false : array_key_first($userDNSearch);
+
+            if ($userDNSearch && count($userDNSearch) == 1 && $firstArrayKey) {
+                Yii::debug("Overwrite username " . $username . " to " . $userDNSearch[$firstArrayKey]['dn'], __METHOD__);
+                $this->_curDn = $username = $userDNSearch[$firstArrayKey]['dn'];
+                $domainKey    = $userDNSearch[$firstArrayKey]['domainKey'];
+                Yii::debug("And domainKey to: " . $domainKey, __METHOD__);
+            } else {
+                Yii::warning("Should overwrite username to DN, but something went wrong while finding the users DN. Leave it as is", __METHOD__);
+            }
+        }
 
         if ($domainKey === false) {
             Yii::debug("Using all domains", __METHOD__);
@@ -222,22 +242,6 @@ class LdapAuth extends BaseObject
             ldap_set_option($l, LDAP_OPT_PROTOCOL_VERSION, 3);
             ldap_set_option($l, LDAP_OPT_REFERRALS, 0);
             ldap_set_option($l, LDAP_OPT_NETWORK_TIMEOUT, 3);
-
-            if ($fetchUserDN) {
-                Yii::debug("We have to determine the user DN first!", __METHOD__);
-                $userDNSearch = $this->searchUser($username, ['dn'], null, $domainKey, true);
-                Yii::debug("fetchUserDN: yes - Result:", __METHOD__);
-                Yii::debug($userDNSearch, __METHOD__);
-
-                $firstArrayKey = !$userDNSearch ? false : array_key_first($userDNSearch);
-
-                if ($userDNSearch && count($userDNSearch) == 1 && $firstArrayKey) {
-                    Yii::debug("Overwrite username " . $username . " to " . $userDNSearch[$firstArrayKey]['dn'], __METHOD__);
-                    $username = $userDNSearch[$firstArrayKey]['dn'];
-                } else {
-                    Yii::warning("Should overwrite username to DN, but something went wrong while finding the users DN. Leave it as is", __METHOD__);
-                }
-            }
 
             $bind_dn = strpos($username, '@') === false && strpos($username, ',') === false ? $username . '@' . $domainData['name'] : $username;
 
@@ -376,7 +380,7 @@ class LdapAuth extends BaseObject
 
                 if ($result) {
                     $entries = ldap_get_entries($this->_l, $result);
-                    Yii::debug('Found entries: ' . ($entries ? count($entries) : '0'), __FUNCTION__);
+                    Yii::debug('Found entries: ' . ($entries ? $entries["count"] : '0'), __FUNCTION__);
                     foreach ($entries as $entry) {
                         if (!is_array($entry) || empty($entry)) {
                             continue;
@@ -441,6 +445,55 @@ class LdapAuth extends BaseObject
 
         return empty($return) ? [] : $return;
 
+
+    }
+
+    /**
+     * Performs attribute updates (with special handling of a few attributes, like unicodepwd). A previous ->login is required!
+     * @param array $attributes The attribute (array keys are the attribute names, the array values are the attribute values)
+     * @param string $dn The DN which should be updated - if not provided, the eventually previous examined one will be used.
+     */
+    public function updateAttributes($attributes, $dn = null)
+    {
+        if (empty($dn) && empty($this->_curDn)) {
+            Yii::error('provided DN is empty and got no dn from previous login!', __FUNCTION__);
+            return false;
+        }
+
+        $dn = empty($dn) ? $this->_curDn : $dn;
+
+        if (!is_array($attributes)) {
+            Yii::error('Provided attributes are not an array!', __FUNCTION__);
+            return false;
+        }
+
+        foreach ($attributes as $attribute => $value) {
+            Yii::info('Processing attribute ' . $attribute, __FUNCTION__);
+
+            switch ($attribute) {
+                case 'unicodepwd':
+                    Yii::info('Patching new password', __FUNCTION__);
+                    $password = "\"$value\"";
+                    $len      = strlen($password);
+                    $newPassw = "";
+
+                    for ($i = 0; $i < $len; $i++) {
+                        $newPassw .= "{$password[$i]}\000";
+                    }
+
+                    $value = $newPassw;
+                    break;
+            }
+
+            Yii::debug('Trying to set ' . $attribute . ' to ' . print_r($value, true), __FUNCTION__);
+
+            if (!ldap_mod_replace($this->_l, $dn, [$attribute => $value])) {
+                Yii::error('Could not update attribute: ' . ldap_error($this->_l), __FUNCTION__);
+                return false;
+            }
+        }
+
+        return true;
 
     }
 
