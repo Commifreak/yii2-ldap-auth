@@ -316,14 +316,15 @@ class LdapAuth extends BaseObject
      * @param array|null $attributes Attributes to get back
      * @param string|null $searchFilter Filter string
      * @param integer $domainKey You can provide integer domainkey, this is then used as target domain! Otherwise it searches in all domains
-     * @return array|bool
+     * @param bool $onlyActiveAccounts SHould the search result only contain active accounts? => https://www.der-windows-papst.de/2016/12/18/active-directory-useraccountcontrol-values/
+     * @return array
+     * @throws \InvalidArgumentException
      */
-    public function searchUser($searchFor, $attributes = "", $searchFilter = "", $domainKey = false, $onlyActiveAccounts = false)
+    public function searchUser(string $searchFor, $attributes = "", $searchFilter = "", $domainKey = false, $onlyActiveAccounts = false)
     {
 
-        if (empty($searchFor) && empty($searchFilter)) {
-            Yii::error("Search input and custom searchFilter are empty!", __METHOD__);
-            return false;
+        if (empty($searchFor)) {
+            throw new InvalidArgumentException("Search term is empty!");
         }
 
         if (empty($attributes)) {
@@ -431,9 +432,6 @@ class LdapAuth extends BaseObject
                 }
                 // Empty cookie means last page
             } while (!empty($cookie));
-
-
-            $i++;
 
             // Reset LDAP Link
             ldap_close($this->_l);
