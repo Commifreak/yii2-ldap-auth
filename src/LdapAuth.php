@@ -317,7 +317,7 @@ class LdapAuth extends BaseObject
      * @param string|null $searchFilter Filter string
      * @param integer $domainKey You can provide integer domainkey, this is then used as target domain! Otherwise it searches in all domains
      * @param bool $onlyActiveAccounts SHould the search result only contain active accounts? => https://www.der-windows-papst.de/2016/12/18/active-directory-useraccountcontrol-values/
-     * @return array
+     * @return array An Array with the results, indexed by their SID
      * @throws \InvalidArgumentException
      */
     public function searchUser(string $searchFor, $attributes = "", $searchFilter = "", $domainKey = false, $onlyActiveAccounts = false)
