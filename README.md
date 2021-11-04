@@ -42,7 +42,8 @@ Either you use it as standalone or add this as component:
 ]
 ```
 
-You can omit `autodetectIps` if you don't want Ips for a specific domain.
+You can omit `autodetectIps` if you don't want Ips for a specific domain. You can set `useSSL` if you want to use
+encryption.
 
 __Attention!__ You need to define `baseDn`. This defines the baseDN in where the function will search for the user data!
 
