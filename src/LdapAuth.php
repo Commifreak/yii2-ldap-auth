@@ -314,7 +314,7 @@ class LdapAuth extends BaseObject
     /**
      * @param string $searchFor Search-Term
      * @param array|null $attributes Attributes to get back
-     * @param string|null $searchFilter Filter string
+     * @param string|null $searchFilter Filter string. Set %searchFor% als placeholder to search for $searchFor
      * @param integer $domainKey You can provide integer domainkey, this is then used as target domain! Otherwise it searches in all domains
      * @param bool $onlyActiveAccounts SHould the search result only contain active accounts? => https://www.der-windows-papst.de/2016/12/18/active-directory-useraccountcontrol-values/
      * @return array An Array with the results, indexed by their SID
@@ -322,10 +322,6 @@ class LdapAuth extends BaseObject
      */
     public function searchUser(string $searchFor, $attributes = "", $searchFilter = "", $domainKey = false, $onlyActiveAccounts = false)
     {
-
-        if (empty($searchFor)) {
-            throw new InvalidArgumentException("Search term is empty!");
-        }
 
         if (empty($attributes)) {
             $attributes = ['sn', 'objectSid', 'sIDHistory', 'givenName', 'mail', 'telephoneNumber', 'l', 'physicalDeliveryOfficeName'];
@@ -342,6 +338,10 @@ class LdapAuth extends BaseObject
 
         if (empty($searchFilter)) {
             $searchFilter = "(&(objectCategory=person)" . $onlyActive . "(|(objectSid=%searchFor%)(sIDHistory=%searchFor%)(samaccountname=*%searchFor%*)(mail=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)(l=%searchFor%)(physicalDeliveryOfficeName=%searchFor%)))";
+        }
+
+        if (empty($searchFor) && strpos($searchFilter, '%searchFor%') === false) {
+            throw new InvalidArgumentException("Search term is empty but the filter has a placeholder set! Set a term or set a new filter.");
         }
 
         // Default set
