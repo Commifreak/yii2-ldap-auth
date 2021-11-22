@@ -340,7 +340,7 @@ class LdapAuth extends BaseObject
             $searchFilter = "(&(objectCategory=person)" . $onlyActive . "(|(objectSid=%searchFor%)(sIDHistory=%searchFor%)(samaccountname=*%searchFor%*)(mail=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)(l=%searchFor%)(physicalDeliveryOfficeName=%searchFor%)))";
         }
 
-        if (empty($searchFor) && strpos($searchFilter, '%searchFor%') === false) {
+        if (empty($searchFor) && strpos($searchFilter, '%searchFor%') !== false) {
             throw new InvalidArgumentException("Search term is empty but the filter has a placeholder set! Set a term or set a new filter.");
         }
 
