@@ -376,6 +376,11 @@ class LdapAuth extends BaseObject
                 $result = @ldap_search($this->_l, $this->_ldapBaseDn, $searchFilter, $attributes, 0, 0, 0, LDAP_DEREF_NEVER, [
                     ['oid' => LDAP_CONTROL_PAGEDRESULTS, 'value' => ['size' => 500, 'cookie' => $cookie]]
                 ]);
+                if (!$result) {
+                    // Something is wrong with the search query
+                    Yii::warning('ldap_search_error: ' . ldap_error($this->_l));
+                    break;
+                }
                 ldap_parse_result($this->_l, $result, $errcode, $matcheddn, $errmsg, $referrals, $controls);
 
 
