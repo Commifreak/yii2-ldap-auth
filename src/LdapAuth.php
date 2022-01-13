@@ -380,8 +380,9 @@ class LdapAuth extends BaseObject
                     // Something is wrong with the search query
                     if (is_null($this->_l)) {
                         Yii::warning('ldap_search_error: null', __FUNCTION__);
+                    } else {
+                        Yii::warning('ldap_search_error: ' . ldap_error($this->_l), __FUNCTION__);
                     }
-                    Yii::warning('ldap_search_error: ' . ldap_error($this->_l), __FUNCTION__);
                     break;
                 }
                 ldap_parse_result($this->_l, $result, $errcode, $matcheddn, $errmsg, $referrals, $controls);
