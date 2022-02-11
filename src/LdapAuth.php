@@ -317,10 +317,11 @@ class LdapAuth extends BaseObject
      * @param string|null $searchFilter Filter string. Set %searchFor% als placeholder to search for $searchFor
      * @param integer $domainKey You can provide integer domainkey, this is then used as target domain! Otherwise it searches in all domains
      * @param bool $onlyActiveAccounts SHould the search result only contain active accounts? => https://www.der-windows-papst.de/2016/12/18/active-directory-useraccountcontrol-values/
-     * @return array An Array with the results, indexed by their SID
+     * @param bool $allDomainsHaveToBeReachable True: All configured domains need to be reachable in order to get a result. If one is not reachable, false will be returned
+     * @return array|false An Array with the results, indexed by their SID - false if an ERROR occured!
      * @throws \InvalidArgumentException
      */
-    public function searchUser(string $searchFor, $attributes = "", $searchFilter = "", $domainKey = false, $onlyActiveAccounts = false)
+    public function searchUser(string $searchFor, $attributes = "", $searchFilter = "", bool $domainKey = false, bool $onlyActiveAccounts = false, bool $allDomainsHaveToBeReachable = false)
     {
 
         if (empty($attributes)) {
@@ -364,6 +365,11 @@ class LdapAuth extends BaseObject
                 } else {
                     Yii::error('LDAP Connect or Bind error (' . ldap_errno($this->_l) . ' - ' . ldap_error($this->_l) . ') on ' . $domain['hostname'] . ', skipping...');
                 }
+                if ($allDomainsHaveToBeReachable) {
+                    Yii::warning('Abort search, due to error and $allDomainsHaveToBeReachable is true');
+                    return false;
+                }
+                continue;
             }
 
             $searchFilter = str_replace("%searchFor%", addslashes($searchFor), $searchFilter);
