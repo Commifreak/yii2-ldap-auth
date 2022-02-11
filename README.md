@@ -63,7 +63,7 @@ There are 5 basic functions:
   * `$fetchUserDN` determines the user DN, in case you want a bind via a users DN instead of username@hostname
 * `fetchUserData($attributes)`
   * Queries the LDAP for the logged in user and gets some attributes (adjustable list of attributes)
-* `searchUser($searchFor, $attributes, $searchFilter, $domainKey, $onlyActiveAccounts)`
+* `searchUser($searchFor, $attributes, $searchFilter, $domainKey, $onlyActiveAccounts, $allDomainsHaveToBeReachable)`
   * Searches for a user in the LDAP-Directory. This requires a search-user which is configured in the component options.
   * The options let you define what attributes you want back and in which you are searching (defaults to lastname,
     firstname, username and class=person).
@@ -71,6 +71,8 @@ There are 5 basic functions:
     domain
   * `$onlyActiveAccounts` lets you decide whether you only want active or all accounts to be returned. defaults to
     false!
+  * `$allDomainsHaveToBeReachable` True: All configured domains need to be reachable in order to get a result. If one is
+    not reachable, false will be returned
 * `updateAttributes` lets you update the user attributes
   * `$attributes` The attribute (array keys are the attribute names, the array values are the attribute values)
   * `$dn` The DN which should be updated - if not provided, the eventually previous examined one will be used.
