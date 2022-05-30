@@ -295,7 +295,7 @@ class LdapAuth extends BaseObject
         if ($result) {
             $entries = ldap_get_entries($this->_l, $result);
             if ($entries['count'] > 1 || $entries['count'] == 0) {
-                Yii::error('[FetchUserData]: Found 0 or more than one result!', __METHOD__);
+                Yii::warning('[FetchUserData]: Found 0 or more than one result!', __METHOD__);
                 return false;
             }
             if (!isset($entries[0]) && !isset($entries[0]['objectsid'])) {
