@@ -312,7 +312,7 @@ class LdapAuth extends BaseObject
     }
 
     /**
-     * @param string $searchFor Search-Term
+     * @param string|null $searchFor Search-Term
      * @param array|null $attributes Attributes to get back
      * @param string|null $searchFilter Filter string. Set %searchFor% als placeholder to search for $searchFor
      * @param integer $domainKey You can provide integer domainkey, this is then used as target domain! Otherwise it searches in all domains
@@ -321,7 +321,7 @@ class LdapAuth extends BaseObject
      * @return array|false An Array with the results, indexed by their SID - false if an ERROR occured!
      * @throws \InvalidArgumentException
      */
-    public function searchUser(string $searchFor, $attributes = "", $searchFilter = "", bool $domainKey = false, bool $onlyActiveAccounts = false, bool $allDomainsHaveToBeReachable = false)
+    public function searchUser(?string $searchFor, ?array $attributes = [], ?string $searchFilter = "", bool $domainKey = false, bool $onlyActiveAccounts = false, bool $allDomainsHaveToBeReachable = false)
     {
 
         if (empty($attributes)) {
@@ -338,7 +338,7 @@ class LdapAuth extends BaseObject
         }
 
         if (empty($searchFilter)) {
-            $searchFilter = "(&(objectCategory=person)" . $onlyActive . "(|(objectSid=%searchFor%)(sIDHistory=%searchFor%)(samaccountname=*%searchFor%*)(mail=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)(l=%searchFor%)(physicalDeliveryOfficeName=%searchFor%)))";
+            $searchFilter = "(&(objectCategory=person) %onlyActive% (|(objectSid=%searchFor%)(sIDHistory=%searchFor%)(samaccountname=*%searchFor%*)(mail=*%searchFor%*)(sn=*%searchFor%*)(givenName=*%searchFor%*)(l=%searchFor%)(physicalDeliveryOfficeName=%searchFor%)))";
         }
 
         if (empty($searchFor) && strpos($searchFilter, '%searchFor%') !== false) {
@@ -372,7 +372,7 @@ class LdapAuth extends BaseObject
                 continue;
             }
 
-            $searchFilter = str_replace("%searchFor%", addslashes($searchFor), $searchFilter);
+            $searchFilter = str_replace(["%searchFor%", "%onlyActive%"], [addslashes($searchFor), $onlyActive], $searchFilter);
 
             Yii::debug('Search-Filter: ' . $searchFilter, __METHOD__);
 
@@ -547,7 +547,7 @@ class LdapAuth extends BaseObject
             $count  = $value['count'];
             $newVal = "";
             for ($i = 0; $i < $count; $i++) {
-                $newVal .= $value[$i];
+                $newVal .= $value[$i]; // Concat? Wouldnt it be better to return an array with all values??
             }
             $newEntry[$attr] = $newVal;
         }
