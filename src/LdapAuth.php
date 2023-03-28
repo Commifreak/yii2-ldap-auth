@@ -233,24 +233,39 @@ class LdapAuth extends BaseObject
 
             Yii::debug('Connecting to ' . $hostPrefix . ', Port: ' . $port, __METHOD__);
 
+            ldap_set_option(null, LDAP_OPT_NETWORK_TIMEOUT, 5);
             $l = @ldap_connect($hostPrefix, $port);
             if (!$l) {
                 Yii::warning('Connect failed! ' . ldap_error($l), __METHOD__);
                 continue;
             }
 
+            ldap_set_option($l, LDAP_OPT_NETWORK_TIMEOUT, 5);
             ldap_set_option($l, LDAP_OPT_PROTOCOL_VERSION, 3);
             ldap_set_option($l, LDAP_OPT_REFERRALS, 0);
-            ldap_set_option($l, LDAP_OPT_NETWORK_TIMEOUT, 3);
 
             $bind_dn = strpos($username, '@') === false && strpos($username, ',') === false ? $username . '@' . $domainData['name'] : $username;
 
             Yii::debug('Trying to authenticate with DN ' . $bind_dn, __METHOD__);
 
-            $b = @ldap_bind($l, $bind_dn, $password);
+            $connTry   = 0;
+            $connected = false;
+            do {
+                $connTry++;
+                $b = @ldap_bind($l, $bind_dn, $password);
+                if (!$b && ldap_errno($l) === -1) { // -1 = No TCP connection
+                    Yii::warning("Connect try #$connTry failed!", __METHOD__);
+                } else {
+                    $connected = true;
+                }
+            } while ($connTry < 3 && !$connected);
+
+            if ($connTry == 3 && !$connected) {
+                Yii::error("No answer from LDAP after $connTry tries!", __METHOD__);
+            }
 
             if (!$b) {
-                Yii::warning('Bind failed! ' . ldap_error($l), __METHOD__);
+                Yii::warning('Bind failed! ' . ldap_error($l) . ' - Errno: ' . ldap_errno($l), __METHOD__);
                 continue;
             }
 
@@ -552,6 +567,11 @@ class LdapAuth extends BaseObject
             $newEntry[$attr] = $newVal;
         }
         return $newEntry;
+    }
+
+    public function getLastError()
+    {
+        return ldap_error($this->_l);
     }
 
 }
