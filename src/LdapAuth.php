@@ -223,10 +223,10 @@ class LdapAuth extends BaseObject
 
             Yii::debug('Trying to connect to Domain #' . $domainKey . ' (' . $domainData['hostname'] . ')', __METHOD__);
 
-            if (!self::serviceping($domainData['hostname'], $ssl ? 636 : null)) {
-                Yii::error('Connection failed!', __METHOD__);
-                continue;
-            }
+//            if (!self::serviceping($domainData['hostname'], $ssl ? 636 : null)) {
+//                Yii::error('Connection failed!', __METHOD__);
+//                continue;
+//            }
 
             $hostPrefix = ($ssl ? 'ldaps://' : 'ldap://') . $domainData['hostname'];
             $port       = $ssl ? 636 : 389;
