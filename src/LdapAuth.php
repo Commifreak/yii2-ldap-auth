@@ -46,6 +46,24 @@ class LdapAuth extends BaseObject
      */
     public $filterBySidhistory = false;
 
+    /**
+     * Enable optional object caching. Uses Yii::$app->cache component. Or enable APCu with `forceApcuCache`
+     * @var bool
+     */
+    public $enableCache = false;
+
+    /**
+     * Force the use of APCu caching instead of the Yii2 cache component
+     * @var bool
+     */
+    public $forceApcuCache = false;
+
+    /**
+     * Time in seconds objects are cached, if `forceApcuCache` is enabled!
+     * @var int
+     */
+    public $apcuCacheTtl = 3600;
+
     private $_ldapBaseDn;
     private $_l;
     private $_username;
@@ -57,6 +75,15 @@ class LdapAuth extends BaseObject
 
         if (!function_exists('ldap_connect')) {
             throw new Exception("LDAP-extension missing :(");
+        }
+
+        // Check for APCu missing if not cli.
+        if (php_sapi_name() != 'cli' && $this->enableCache && $this->forceApcuCache && !extension_loaded('apcu')) {
+            throw new Exception("Caching is enabled but APCU is not! :(");
+        }
+
+        if ($this->enableCache && !$this->forceApcuCache && !isset(Yii::$app->cache)) {
+            throw new Exception("Caching is enabled with Yii cache component but its not configured! :(");
         }
 
         // Sort the domains one time for this run!
@@ -360,6 +387,34 @@ class LdapAuth extends BaseObject
             throw new InvalidArgumentException("Search term is empty but the filter has a placeholder set! Set a term or set a new filter.");
         }
 
+        $cacheKey = 'y2ldap_' . md5($searchFor . (implode("", $attributes)) . $searchFilter);
+        Yii::debug("Cache-Key: " . $cacheKey, __METHOD__);
+
+        if ($this->enableCache) {
+            if (!$this->forceApcuCache) {
+                $storedValue = Yii::$app->cache->get($cacheKey);
+                if ($storedValue) {
+                    Yii::debug("[YII] Returning cached asset", __METHOD__);
+                    return $storedValue;
+                }
+                Yii::debug("Was not cached or invalid", __METHOD__);
+            } else {
+                if (apcu_exists($cacheKey)) {
+                    Yii::debug("Caching enabled and this search is stored!", __METHOD__);
+                    $apcuValue = apcu_fetch($cacheKey);
+                    if ($apcuValue !== false) {
+                        Yii::debug("[APCU] Returning cached asset!", __METHOD__);
+                        return $apcuValue;
+                    }
+                    Yii::warning("Could not return cached asset!", __METHOD__);
+                } else {
+                    Yii::debug("No cache entry!", __METHOD__);
+                }
+            }
+        } else {
+            Yii::debug("Caching disabled", __METHOD__);
+        }
+
         // Default set
         $domains = $this->domains;
 
@@ -470,6 +525,27 @@ class LdapAuth extends BaseObject
 
         Yii::debug("Result:", __METHOD__);
         Yii::debug($return, __METHOD__);
+
+        if ($this->enableCache) {
+            Yii::debug("Adding cache entry", __METHOD__);
+            if (!$this->forceApcuCache) {
+                if (Yii::$app->cache->set($cacheKey, $result)) {
+                    Yii::debug("[YII] Caching succeeded!", __METHOD__);
+                } else {
+                    Yii::warning("[YII] Caching failed!", __METHOD__);
+                }
+            } else {
+                $cacheResult = apcu_store($cacheKey, $return, $this->apcuCacheTtl);
+                if (!$cacheResult) {
+                    Yii::warning("[APCU] Caching was not successful!", __METHOD__);
+                } else {
+                    Yii::debug("[APCU] Cached!", __METHOD__);
+                }
+            }
+        } else {
+            Yii::debug("Not caching: Disabled", __METHOD__);
+        }
+
 
         return empty($return) ? [] : $return;
 
