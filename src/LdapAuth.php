@@ -131,6 +131,11 @@ class LdapAuth extends BaseObject
     public function autoDetect($overrideIp = false)
     {
 
+        if (!isset(Yii::$app->request) || !method_exists(Yii::$app->request, 'getUserIP')) {
+            Yii::debug("[Autodetect] Skipping autodetection: No getUserIP method found!", __METHOD__);
+            return 0;
+        }
+
         Yii::debug('[Autodetect] Started IP autodetection!', __METHOD__);
 
         if (count($this->domains) <= 1) {
@@ -190,6 +195,9 @@ class LdapAuth extends BaseObject
             Yii::debug($userDNSearch, __METHOD__);
 
             $firstArrayKey = !$userDNSearch ? false : array_key_first($userDNSearch);
+
+            Yii::debug("userDNSearch result:", __METHOD__);
+            Yii::debug($userDNSearch, __METHOD__);
 
             if ($userDNSearch && count($userDNSearch) == 1 && $firstArrayKey) {
                 Yii::debug("Overwrite username " . $username . " to " . $userDNSearch[$firstArrayKey]['dn'], __METHOD__);
