@@ -31,6 +31,7 @@ class LdapAuth extends BaseObject
             'baseDn' => 'DC=Example,DC=tld',
             'publicSearchUser' => 'example@domain',
             'publicSearchUserPassword' => 'secret',
+            'pagedResultsSize' => 0
         ],
     ];
 
@@ -454,12 +455,25 @@ class LdapAuth extends BaseObject
 
             Yii::debug('Search-Filter: ' . $searchFilter, __METHOD__);
 
+            $result          = ldap_read($this->_l, '', '(objectClass=*)', ['supportedControl']);
+            $supControls     = ldap_get_entries($this->_l, $result);
+            Yii::debug("Supported Controls here:", __METHOD__);
+            Yii::debug($supControls, __METHOD__);
+
+
             $cookie = '';
+            $requestControls = [];
+            if (($domain['pagedResultsSize'] ?? 0) > 0) {
+                if (!in_array(LDAP_CONTROL_PAGEDRESULTS, $supControls[0]['supportedcontrol'])) {
+                    Yii::error("This server does NOT support pagination!", __METHOD__);
+                }
+                $requestControls = [
+                    ['oid' => LDAP_CONTROL_PAGEDRESULTS, 'value' => ['size' => $domain['pagedResultsSize'], 'cookie' => $cookie], 'iscritical' => false]
+                ];
+            }
 
             do {
-                $result = @ldap_search($this->_l, $this->_ldapBaseDn, $searchFilter, $attributes, 0, 0, 0, LDAP_DEREF_NEVER, [
-                    ['oid' => LDAP_CONTROL_PAGEDRESULTS, 'value' => ['size' => 500, 'cookie' => $cookie]]
-                ]);
+                $result = ldap_search($this->_l, $this->_ldapBaseDn, $searchFilter, $attributes, 0, -1, -1, LDAP_DEREF_NEVER, $requestControls);
                 if (!$result) {
                     // Something is wrong with the search query
                     if (is_null($this->_l)) {
@@ -474,7 +488,7 @@ class LdapAuth extends BaseObject
 
                 if ($result) {
                     $entries = ldap_get_entries($this->_l, $result);
-                    Yii::debug('Found entries: ' . ($entries ? $entries["count"] : '0'), __FUNCTION__);
+                    Yii::debug('Found entries: ' . ($entries ? $entries["count"] : '0'), __METHOD__);
                     foreach ($entries as $entry) {
                         if (!is_array($entry) || empty($entry)) {
                             continue;
@@ -517,10 +531,13 @@ class LdapAuth extends BaseObject
                 }
 
 
+                Yii::debug($controls, __METHOD__);
                 if (isset($controls[LDAP_CONTROL_PAGEDRESULTS]['value']['cookie'])) {
+                    Yii::debug("Page cookie set!", __METHOD__);
                     // You need to pass the cookie from the last call to the next one
                     $cookie = $controls[LDAP_CONTROL_PAGEDRESULTS]['value']['cookie'];
                 } else {
+                    Yii::debug("Page cookie NOT set!", __METHOD__);
                     $cookie = '';
                 }
                 // Empty cookie means last page
@@ -612,9 +629,7 @@ class LdapAuth extends BaseObject
     public static function SIDtoString($ADsid)
     {
         $results = [];
-        Yii::debug('Converting SID...', __METHOD__);
         for ($cnt = 0; $cnt < $ADsid['count']; $cnt++) {
-            Yii::debug('Run ' . $cnt, __METHOD__);
             $sid = "S-";
             //$ADguid = $info[0]['objectguid'][0];
             $sidinhex = str_split(bin2hex($ADsid[$cnt]), 2);
