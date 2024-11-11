@@ -88,19 +88,17 @@ class LdapAuth extends BaseObject
         }
 
         // Sort the domains one time for this run!
-        if (Yii::$app instanceof \yii\web\Application) {
-            $autoDetectDomainKey = $this->autoDetect();
+        $autoDetectDomainKey = $this->autoDetect();
 
-            $domains = $this->domains;
+        $domains = $this->domains;
 
-            if ($autoDetectDomainKey) {
-                Yii::debug("AutoDetected domain: #" . $autoDetectDomainKey, __METHOD__);
-                unset($domains[$autoDetectDomainKey]);
-                $domains       = array_merge([$this->domains[$autoDetectDomainKey]], $domains);
-                $this->domains = $domains;
-            } else {
-                Yii::debug('AutoDetect was not successful!', __METHOD__);
-            }
+        if ($autoDetectDomainKey) {
+            Yii::debug("AutoDetected domain: #" . $autoDetectDomainKey, __METHOD__);
+            unset($domains[$autoDetectDomainKey]);
+            $domains       = array_merge([$this->domains[$autoDetectDomainKey]], $domains);
+            $this->domains = $domains;
+        } else {
+            Yii::debug('AutoDetect was not successful!', __METHOD__);
         }
     }
 
@@ -148,7 +146,7 @@ class LdapAuth extends BaseObject
 
         Yii::debug('[Autodetect] ' . ($overrideIp ? 'OverrideIp set!' : 'No override IP set!'), __METHOD__);
 
-        $clientIp = $overrideIp ?: Yii::$app->request->getUserIP();
+        $clientIp = $overrideIp ? $overrideIp : Yii::$app->request->getUserIP();
 
         Yii::debug('[Autodetect] Detected IP: ' . $clientIp, __METHOD__);
 
