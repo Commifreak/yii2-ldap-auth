@@ -93,13 +93,11 @@ class LdapAuth extends BaseObject
         // Sort the domains one time for this run!
         $autoDetectDomainKey = $this->autoDetect();
 
-        $domains = $this->domains;
-
         if ($autoDetectDomainKey) {
             Yii::debug("AutoDetected domain: #" . $autoDetectDomainKey, __METHOD__);
-            unset($domains[$autoDetectDomainKey]);
-            $domains       = array_merge([$this->domains[$autoDetectDomainKey]], $domains);
-            $this->domains = $domains;
+            $detectedDomain = $this->domains[$autoDetectDomainKey];
+            unset($this->domains[$autoDetectDomainKey]);
+            $this->domains = [$autoDetectDomainKey => $detectedDomain] + $this->domains;
         } else {
             Yii::debug('AutoDetect was not successful!', __METHOD__);
         }
