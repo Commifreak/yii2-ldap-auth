@@ -642,17 +642,7 @@ class LdapAuth extends BaseObject
             if (!isset($group['member'])) {
                 continue;
             }
-            if (is_string($group['member'])) {
-                $group['member'] = [$group['member']];
-            }
-            $groups[$gkey]['users'] = [];
-            foreach ($group['member'] as $key => $member) {
-                if ($key == 'count') {
-                    continue;
-                }
-                $groups[$gkey]['users'] = array_merge($groups[$gkey]['users'], $this->searchUser(null, ['dn'], '(&(objectCategory=person))', $group['domainKey'], false, false, $member));
-            }
-
+            $groups[$gkey]['users'] = $this->searchUser(null, ['dn'], '(&(objectCategory=person)(memberof=' . $group['dn'] . '))', $group['domainKey']);
         }
 
         return $groups;
