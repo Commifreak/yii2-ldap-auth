@@ -70,7 +70,7 @@ class LdapAuth extends BaseObject
     private $_username;
     private $_curDn;
     private $_curDomainHostname;
-
+    private $_curDomainKey;
     private $_singleValuedAttrs;
 
     public function init()
@@ -188,8 +188,6 @@ class LdapAuth extends BaseObject
     public function login($username, $password, $domainKey = false, $fetchUserDN = false)
     {
 
-        Yii::debug('Hello! :) Trying to log you in via LDAP!', __METHOD__);
-
         if ($fetchUserDN) {
             Yii::debug("We have to determine the user DN first!", __METHOD__);
             $userDNSearch = $this->searchUser($username, ['dn'], null, $domainKey, true);
@@ -209,6 +207,11 @@ class LdapAuth extends BaseObject
             } else {
                 Yii::warning("Should overwrite username to DN, but something went wrong while finding the users DN. Leave it as is", __METHOD__);
             }
+        }
+
+        if ($this->_l && $domainKey && $domainKey === $this->_curDomainKey) {
+            Yii::debug("Reusing current LDAP link identifier", __METHOD__);
+            return true;
         }
 
         if ($domainKey === false) {
@@ -310,6 +313,7 @@ class LdapAuth extends BaseObject
             $this->_ldapBaseDn = $domainData['baseDn'];
             $this->_username   = $username;
             $this->_curDomainHostname = $domainData['hostname'];
+            $this->_curDomainKey = $domainKey;
 
             return true;
         }
@@ -357,7 +361,7 @@ class LdapAuth extends BaseObject
             }
             $sid        = self::SIDtoString($entries[0]['objectsid'])[0];
             $sidHistory = isset($entries[0]['sidhistory']) ? self::SIDtoString($entries[0]['sidhistory']) : null;
-            return array_merge(['sid' => $sid, 'sidhistory' => $sidHistory], $this->handleEntry($entries[0], $dom));
+            return array_merge(['sid' => $sid, 'sidhistory' => $sidHistory], $this->handleEntry($entries[0]));
         } else {
             Yii::error('[FetchUserData]: Search failed: ' . ldap_error($this->_l), __METHOD__);
             return false;
@@ -457,12 +461,10 @@ class LdapAuth extends BaseObject
             $searchFilter = str_replace(["%searchFor%", "%onlyActive%"], [addslashes($searchFor), $onlyActive], $searchFilter);
             $baseDN = $baseDN ?: $this->_ldapBaseDn;
 
-            Yii::debug('Search-Filter: ' . $searchFilter, __METHOD__);
+            Yii::debug('Search-Filter: ' . $searchFilter . " | BaseDN: " . $baseDN, __METHOD__);
 
             $result          = ldap_read($this->_l, '', '(objectClass=*)', ['supportedControl']);
             $supControls     = ldap_get_entries($this->_l, $result);
-            Yii::debug("Supported Controls here:", __METHOD__);
-            Yii::debug($supControls, __METHOD__);
 
             if (empty($this->_singleValuedAttrs) || !isset($this->_singleValuedAttrs[$domain['hostname']])) {
                 $this->_singleValuedAttrs[$domain['hostname']] = [];
@@ -522,7 +524,7 @@ class LdapAuth extends BaseObject
                     } else {
                         Yii::error('ldap_search_error: ' . ldap_error($this->_l), __METHOD__);
                     }
-                    Yii::error("Search query: " . $searchFilter, __METHOD__);
+                    $this->_l = null;
                     break;
                 }
                 ldap_parse_result($this->_l, $result, $errcode, $matcheddn, $errmsg, $referrals, $controls);
@@ -585,13 +587,11 @@ class LdapAuth extends BaseObject
                 // Empty cookie means last page
             } while (!empty($cookie));
 
-            // Reset LDAP Link
-            ldap_close($this->_l);
-            $this->_l = null;
-        }
 
-        Yii::debug("Result:", __METHOD__);
-        Yii::debug($return, __METHOD__);
+            if ($result) {
+                @ldap_free_result($result);
+            }
+        }
 
         if ($this->enableCache) {
             Yii::debug("Adding cache entry", __METHOD__);
@@ -730,7 +730,7 @@ class LdapAuth extends BaseObject
                     continue;
                 }
             }
-            Yii::debug('Converted SID to: ' . $sid, __METHOD__);
+//            Yii::debug('Converted SID to: ' . $sid, __METHOD__);
             array_push($results, $sid);
         }
         return $results;
@@ -740,14 +740,14 @@ class LdapAuth extends BaseObject
     {
         $newEntry = [];
         foreach ($entry as $attr => $value) {
-            Yii::debug('Processing attribute ' . $attr, __FUNCTION__);
+//            Yii::debug('Processing attribute ' . $attr, __FUNCTION__);
 
             if (is_int($attr) || $attr == 'objectsid' || $attr == 'sidhistory' || !isset($value['count'])) {
-                Yii::debug('Skipping...', __FUNCTION__);
+//                Yii::debug('Skipping...', __FUNCTION__);
                 continue;
             }
             $count  = $value['count'];
-            Yii::debug('Count: ' . $count, __FUNCTION__);
+//            Yii::debug('Count: ' . $count, __FUNCTION__);
 
             if ($count > 1 || !in_array($attr, $this->_singleValuedAttrs[$this->_curDomainHostname] ?? [])) {
                 unset($value['count']);
@@ -762,6 +762,14 @@ class LdapAuth extends BaseObject
     public function getLastError()
     {
         return ldap_error($this->_l);
+    }
+
+    public function __destruct()
+    {
+        if ($this->_l) {
+            @ldap_close($this->_l);
+            $this->_l = null;
+        }
     }
 
 }
