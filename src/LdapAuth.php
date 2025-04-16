@@ -37,7 +37,7 @@ class LdapAuth extends BaseObject
 
     /**
      * If false (default) any user search would return the whole result.
-     * If true, the script checks every users sidHistory and only return results which are newer (migrated).
+     * If true, the script checks every user sidHistory and only return results which are newer (migrated).
      * A use case for `true`: You have two domains and user "Foo" was copied from Domain 1 to Domain 2 without deleting it from Domain 1 - now you have 2 results for a search "Foo", but the entry in Domain 2 has a set "sidHistory" with its sid from Domain 1.
      * Setting this tp true will filter out the "Foo" from Domain 1, since its sid is listed in the Domain 2 entry of it.
      *
@@ -69,6 +69,9 @@ class LdapAuth extends BaseObject
     private $_l;
     private $_username;
     private $_curDn;
+    private $_curDomainHostname;
+
+    private $_singleValuedAttrs;
 
     public function init()
     {
@@ -308,6 +311,7 @@ class LdapAuth extends BaseObject
             $this->_l          = $l;
             $this->_ldapBaseDn = $domainData['baseDn'];
             $this->_username   = $username;
+            $this->_curDomainHostname = $domainData['hostname'];
 
             return true;
         }
@@ -355,7 +359,7 @@ class LdapAuth extends BaseObject
             }
             $sid        = self::SIDtoString($entries[0]['objectsid'])[0];
             $sidHistory = isset($entries[0]['sidhistory']) ? self::SIDtoString($entries[0]['sidhistory']) : null;
-            return array_merge(['sid' => $sid, 'sidhistory' => $sidHistory], self::handleEntry($entries[0]));
+            return array_merge(['sid' => $sid, 'sidhistory' => $sidHistory], $this->handleEntry($entries[0], $dom));
         } else {
             Yii::error('[FetchUserData]: Search failed: ' . ldap_error($this->_l), __METHOD__);
             return false;
@@ -366,13 +370,14 @@ class LdapAuth extends BaseObject
      * @param string|null $searchFor Search-Term
      * @param array|null $attributes Attributes to get back
      * @param string|null $searchFilter Filter string. Set %searchFor% als placeholder to search for $searchFor
-     * @param integer $domainKey You can provide integer domainkey, this is then used as target domain! Otherwise it searches in all domains
+     * @param int|null $domainKey You can provide integer domainkey, this is then used as target domain! Otherwise it searches in all domains
      * @param bool $onlyActiveAccounts SHould the search result only contain active accounts? => https://www.der-windows-papst.de/2016/12/18/active-directory-useraccountcontrol-values/
      * @param bool $allDomainsHaveToBeReachable True: All configured domains need to be reachable in order to get a result. If one is not reachable, false will be returned
+     * @param string|null $baseDN Use given BaseDN instead of configured one. This normally requires the exact domainKey being set as well.
      * @return array|false An Array with the results, indexed by their SID - false if an ERROR occured!
-     * @throws \InvalidArgumentException
+     * @throws ErrorException
      */
-    public function searchUser(?string $searchFor, ?array $attributes = [], ?string $searchFilter = "", bool $domainKey = false, bool $onlyActiveAccounts = false, bool $allDomainsHaveToBeReachable = false)
+    public function searchUser(?string $searchFor, ?array $attributes = [], ?string $searchFilter = "", ?int $domainKey = null, bool $onlyActiveAccounts = false, bool $allDomainsHaveToBeReachable = false, ?string $baseDN = null)
     {
 
         if (empty($attributes)) {
@@ -452,6 +457,7 @@ class LdapAuth extends BaseObject
             }
 
             $searchFilter = str_replace(["%searchFor%", "%onlyActive%"], [addslashes($searchFor), $onlyActive], $searchFilter);
+            $baseDN = $baseDN ?: $this->_ldapBaseDn;
 
             Yii::debug('Search-Filter: ' . $searchFilter, __METHOD__);
 
@@ -459,6 +465,43 @@ class LdapAuth extends BaseObject
             $supControls     = ldap_get_entries($this->_l, $result);
             Yii::debug("Supported Controls here:", __METHOD__);
             Yii::debug($supControls, __METHOD__);
+
+            if (empty($this->_singleValuedAttrs) || !isset($this->_singleValuedAttrs[$domain['hostname']])) {
+                $this->_singleValuedAttrs[$domain['hostname']] = [];
+                Yii::info("Getting attribute type definitions for this domain!", __METHOD__);
+
+                $result = @ldap_read($this->_l, '', "(objectClass=*)", ["subschemaSubentry"]);
+                if ($result) {
+                    $subSchema = ldap_get_entries($this->_l, $result);
+                    Yii::debug("Subschema entry:", __METHOD__);
+                    Yii::debug($subSchema, __METHOD__);
+
+                    if (isset($subSchema[0]['subschemasubentry'][0])) {
+
+                        $result = @ldap_read($this->_l, $subSchema[0]['subschemasubentry'][0], "(objectClass=*)", ["attributeTypes"]);
+
+                        if ($result) {
+                            $entries = ldap_get_entries($this->_l, $result);
+                            foreach ($entries[0]['attributetypes'] as $key => $definition) {
+                                if (stripos($definition, 'SINGLE-VALUE') !== false) {
+                                    $match = preg_match("/NAME ['\"](.*?)['\"]/", $definition, $matches);
+                                    if ($match && isset($matches[1])) {
+                                        $this->_singleValuedAttrs[$domain['hostname']][] = $matches[1];
+                                    }
+                                }
+                            }
+                        } else {
+                            Yii::warning("Could not read attribute Types" . ldap_error($this->_l), __METHOD__);
+                        }
+                    } else {
+                        Yii::warning("No subschema entry found!", __METHOD__);
+                    }
+                } else {
+                    Yii::warning("Could not read subschema entry: " . ldap_error($this->_l), __METHOD__);
+                }
+            }
+
+
 
 
             $cookie = '';
@@ -473,14 +516,15 @@ class LdapAuth extends BaseObject
             }
 
             do {
-                $result = ldap_search($this->_l, $this->_ldapBaseDn, $searchFilter, $attributes, 0, -1, -1, LDAP_DEREF_NEVER, $requestControls);
+                $result = @ldap_search($this->_l, $baseDN, $searchFilter, $attributes, 0, -1, -1, LDAP_DEREF_NEVER, $requestControls);
                 if (!$result) {
                     // Something is wrong with the search query
                     if (is_null($this->_l)) {
-                        Yii::warning('ldap_search_error: null', __FUNCTION__);
+                        Yii::error('ldap_search_error: null', __METHOD__);
                     } else {
-                        Yii::warning('ldap_search_error: ' . ldap_error($this->_l), __FUNCTION__);
+                        Yii::error('ldap_search_error: ' . ldap_error($this->_l), __METHOD__);
                     }
+                    Yii::error("Search query: " . $searchFilter, __METHOD__);
                     break;
                 }
                 ldap_parse_result($this->_l, $result, $errcode, $matcheddn, $errmsg, $referrals, $controls);
@@ -526,7 +570,7 @@ class LdapAuth extends BaseObject
                             // Enable domainName output if more than one domains configured
                             $additionalData['domainName'] = $this->domains[$i]['name'];
                         }
-                        $return[$sid] = array_merge($additionalData, self::handleEntry($entry));
+                        $return[$sid] = array_merge($additionalData, $this->handleEntry($entry));
                     }
                 }
 
@@ -578,6 +622,45 @@ class LdapAuth extends BaseObject
     }
 
     /**
+     * Searches directly for groups and optionally return its members
+     * @param string|null $searchFor The raw (!) LDAP-Filter. Like (&(objectCategory=group) (|(objectSid=%searchFor%)(cn=*%searchFor%*)))
+     * @param array|null $attributes
+     * @param bool $returnMembers Should the function fetch the group members?
+     * @param int|null $domainKey
+     * @param bool $onlyActiveAccounts
+     * @param bool $allDomainsHaveToBeReachable
+     * @return array|false
+     * @throws ErrorException
+     */
+    public function searchGroup(?string $searchFor, ?array $attributes = ['dn', 'member'], bool $returnMembers = false, ?int $domainKey = null, bool $onlyActiveAccounts = false, bool $allDomainsHaveToBeReachable = false)
+    {
+        $groups = $this->searchUser(null, $attributes, $searchFor, $domainKey, $onlyActiveAccounts, $allDomainsHaveToBeReachable);
+
+        if (!$returnMembers) {
+            return $groups;
+        }
+
+        foreach ($groups as $gkey => $group) {
+            if (!isset($group['member'])) {
+                continue;
+            }
+            if (is_string($group['member'])) {
+                $group['member'] = [$group['member']];
+            }
+            $groups[$gkey]['users'] = [];
+            foreach ($group['member'] as $key => $member) {
+                if ($key == 'count') {
+                    continue;
+                }
+                $groups[$gkey]['users'] = array_merge($groups[$gkey]['users'], $this->searchUser(null, ['dn'], '(&(objectCategory=person))', $group['domainKey'], false, false, $member));
+            }
+
+        }
+
+        return $groups;
+    }
+
+    /**
      * Performs attribute updates (with special handling of a few attributes, like unicodepwd). A previous ->login is required!
      * @param array $attributes The attribute (array keys are the attribute names, the array values are the attribute values)
      * @param string $dn The DN which should be updated - if not provided, the eventually previous examined one will be used.
@@ -597,7 +680,7 @@ class LdapAuth extends BaseObject
         }
 
         foreach ($attributes as $attribute => $value) {
-            Yii::info('Processing attribute ' . $attribute, __FUNCTION__);
+            Yii::debug('Processing attribute ' . $attribute, __FUNCTION__);
 
             switch ($attribute) {
                 case 'unicodepwd':
@@ -641,9 +724,13 @@ class LdapAuth extends BaseObject
             $subauths = hexdec($sidinhex[7]);
             //Loop through Sub Authorities
             for ($i = 0; $i < $subauths; $i++) {
-                $start = 8 + (4 * $i);
-                // X amount of 32Bit (4 Byte) Sub Authorities
-                $sid = $sid . "-" . hexdec($sidinhex[$start + 3] . $sidinhex[$start + 2] . $sidinhex[$start + 1] . $sidinhex[$start]);
+                try {
+                    $start = 8 + (4 * $i);
+                    // X amount of 32Bit (4 Byte) Sub Authorities
+                    $sid = $sid . "-" . hexdec($sidinhex[$start + 3] . $sidinhex[$start + 2] . $sidinhex[$start + 1] . $sidinhex[$start]);
+                } catch (\Exception $ex) {
+                    continue;
+                }
             }
             Yii::debug('Converted SID to: ' . $sid, __METHOD__);
             array_push($results, $sid);
@@ -651,19 +738,25 @@ class LdapAuth extends BaseObject
         return $results;
     }
 
-    public static function handleEntry($entry)
+    private function handleEntry($entry)
     {
         $newEntry = [];
         foreach ($entry as $attr => $value) {
+            Yii::debug('Processing attribute ' . $attr, __FUNCTION__);
+
             if (is_int($attr) || $attr == 'objectsid' || $attr == 'sidhistory' || !isset($value['count'])) {
+                Yii::debug('Skipping...', __FUNCTION__);
                 continue;
             }
             $count  = $value['count'];
-            $newVal = "";
-            for ($i = 0; $i < $count; $i++) {
-                $newVal .= $value[$i]; // Concat? Wouldnt it be better to return an array with all values??
+            Yii::debug('Count: ' . $count, __FUNCTION__);
+
+            if ($count > 1 || !in_array($attr, $this->_singleValuedAttrs[$this->_curDomainHostname] ?? [])) {
+                unset($value['count']);
+                $newEntry[$attr] = $value; // Return value as is, because it contains multiple entries
+            } else {
+                $newEntry[$attr] = $value[0]; // extract first result, because it's the only
             }
-            $newEntry[$attr] = $newVal;
         }
         return $newEntry;
     }
