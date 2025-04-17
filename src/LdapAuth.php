@@ -309,9 +309,9 @@ class LdapAuth extends BaseObject
                 continue;
             }
 
-            $this->_l          = $l;
-            $this->_ldapBaseDn = $domainData['baseDn'];
-            $this->_username   = $username;
+            $this->_l            = $l;
+            $this->_ldapBaseDn   = $domainData['baseDn'];
+            $this->_username     = $username;
             $this->_curDomainHostname = $domainData['hostname'];
             $this->_curDomainKey = $domainKey;
 
@@ -463,8 +463,8 @@ class LdapAuth extends BaseObject
 
             Yii::debug('Search-Filter: ' . $searchFilter . " | BaseDN: " . $baseDN, __METHOD__);
 
-            $result          = ldap_read($this->_l, '', '(objectClass=*)', ['supportedControl']);
-            $supControls     = ldap_get_entries($this->_l, $result);
+            $result      = ldap_read($this->_l, '', '(objectClass=*)', ['supportedControl']);
+            $supControls = ldap_get_entries($this->_l, $result);
 
             if (empty($this->_singleValuedAttrs) || !isset($this->_singleValuedAttrs[$domain['hostname']])) {
                 $this->_singleValuedAttrs[$domain['hostname']] = [];
@@ -486,7 +486,7 @@ class LdapAuth extends BaseObject
                                 if (stripos($definition, 'SINGLE-VALUE') !== false) {
                                     $match = preg_match("/NAME ['\"](.*?)['\"]/", $definition, $matches);
                                     if ($match && isset($matches[1])) {
-                                        $this->_singleValuedAttrs[$domain['hostname']][] = $matches[1];
+                                        $this->_singleValuedAttrs[$domain['hostname']][] = strtolower($matches[1]);
                                     }
                                 }
                             }
@@ -500,8 +500,6 @@ class LdapAuth extends BaseObject
                     Yii::warning("Could not read subschema entry: " . ldap_error($this->_l), __METHOD__);
                 }
             }
-
-
 
 
             $cookie = '';
@@ -621,8 +619,10 @@ class LdapAuth extends BaseObject
 
     /**
      * Searches directly for groups and optionally return its members
-     * @param string|null $searchFor The raw (!) LDAP-Filter. Like (&(objectCategory=group) (|(objectSid=%searchFor%)(cn=*%searchFor%*)))
-     * @param array|null $attributes
+     * @param string|null $searchFor The search value (like in searchUser). Like (&(objectCategory=group) (|(objectSid=%searchFor%)(cn=*%searchFor%*)))
+     * @param array|null $userAttributes
+     * @param array $groupAttributes
+     * @param string|null $searchFilter The LDAP-Filter
      * @param bool $returnMembers Should the function fetch the group members?
      * @param int|null $domainKey
      * @param bool $onlyActiveAccounts
@@ -630,9 +630,20 @@ class LdapAuth extends BaseObject
      * @return array|false
      * @throws ErrorException
      */
-    public function searchGroup(?string $searchFor, ?array $attributes = ['dn', 'member'], bool $returnMembers = false, ?int $domainKey = null, bool $onlyActiveAccounts = false, bool $allDomainsHaveToBeReachable = false)
+    public function searchGroup(?string $searchFor, array $groupAttributes = ['dn', 'member'], ?array $userAttributes = ['dn', 'samaccountname', 'mail'], bool $returnMembers = false, ?string $searchFilter = "", ?int $domainKey = null, bool $onlyActiveAccounts = false, bool $allDomainsHaveToBeReachable = false)
     {
-        $groups = $this->searchUser(null, $attributes, $searchFor, $domainKey, $onlyActiveAccounts, $allDomainsHaveToBeReachable);
+        if (!in_array('dn', $groupAttributes)) {
+            $groupAttributes[] = 'dn';
+        }
+        if (!in_array('member', $groupAttributes)) {
+            $groupAttributes[] = 'member';
+        }
+
+        if (empty($searchFilter)) {
+            $searchFilter = "(&(objectCategory=group) (|(objectSid=%searchFor%)(cn=%searchFor%)))";
+        }
+
+        $groups = $this->searchUser($searchFor, $groupAttributes, $searchFilter, $domainKey, $onlyActiveAccounts, $allDomainsHaveToBeReachable);
 
         if (!$returnMembers) {
             return $groups;
@@ -642,7 +653,7 @@ class LdapAuth extends BaseObject
             if (!isset($group['member'])) {
                 continue;
             }
-            $groups[$gkey]['users'] = $this->searchUser(null, ['dn'], '(&(objectCategory=person)(memberof=' . $group['dn'] . '))', $group['domainKey']);
+            $groups[$gkey]['users'] = $this->searchUser(null, $userAttributes, '(&(objectCategory=person)(memberof=' . $group['dn'] . '))', $group['domainKey']);
         }
 
         return $groups;
@@ -730,16 +741,13 @@ class LdapAuth extends BaseObject
     {
         $newEntry = [];
         foreach ($entry as $attr => $value) {
-//            Yii::debug('Processing attribute ' . $attr, __FUNCTION__);
 
             if (is_int($attr) || $attr == 'objectsid' || $attr == 'sidhistory' || !isset($value['count'])) {
-//                Yii::debug('Skipping...', __FUNCTION__);
                 continue;
             }
-            $count  = $value['count'];
-//            Yii::debug('Count: ' . $count, __FUNCTION__);
+            $count = $value['count'];
 
-            if ($count > 1 || !in_array($attr, $this->_singleValuedAttrs[$this->_curDomainHostname] ?? [])) {
+            if ($count > 1 || !in_array(strtolower($attr), $this->_singleValuedAttrs[$this->_curDomainHostname] ?? [])) {
                 unset($value['count']);
                 $newEntry[$attr] = $value; // Return value as is, because it contains multiple entries
             } else {
