@@ -459,9 +459,9 @@ class LdapAuth extends BaseObject
             }
 
             $searchFilter = str_replace(["%searchFor%", "%onlyActive%"], [addslashes($searchFor), $onlyActive], $searchFilter);
-            $baseDN = $baseDN ?: $this->_ldapBaseDn;
+            $_baseDN = $baseDN ?: $this->_ldapBaseDn;
 
-            Yii::debug('Search-Filter: ' . $searchFilter . " | BaseDN: " . $baseDN, __METHOD__);
+            Yii::debug('Search-Filter: ' . $searchFilter . " | BaseDN: " . $_baseDN, __METHOD__);
 
             $result      = ldap_read($this->_l, '', '(objectClass=*)', ['supportedControl']);
             $supControls = ldap_get_entries($this->_l, $result);
@@ -514,7 +514,7 @@ class LdapAuth extends BaseObject
             }
 
             do {
-                $result = @ldap_search($this->_l, $baseDN, $searchFilter, $attributes, 0, -1, -1, LDAP_DEREF_NEVER, $requestControls);
+                $result = @ldap_search($this->_l, $_baseDN, $searchFilter, $attributes, 0, -1, -1, LDAP_DEREF_NEVER, $requestControls);
                 if (!$result) {
                     // Something is wrong with the search query
                     if (is_null($this->_l)) {
