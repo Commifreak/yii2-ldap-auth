@@ -309,6 +309,43 @@ class LdapAuth extends BaseObject
                 continue;
             }
 
+            if (empty($this->_singleValuedAttrs) || !isset($this->_singleValuedAttrs[$domainData['hostname']])) {
+                $this->_singleValuedAttrs[$domainData['hostname']] = [];
+                Yii::info("Getting attribute type definitions for this domain!", __METHOD__);
+
+                $result = @ldap_read($this->_l, '', "(objectClass=*)", ["subschemaSubentry"]);
+                if ($result) {
+                    $subSchema = ldap_get_entries($this->_l, $result);
+                    Yii::debug("Subschema entry:", __METHOD__);
+                    Yii::debug($subSchema, __METHOD__);
+
+                    if (isset($subSchema[0]['subschemasubentry'][0])) {
+
+                        $result = @ldap_read($this->_l, $subSchema[0]['subschemasubentry'][0], "(objectClass=*)", ["attributeTypes"]);
+
+                        if ($result) {
+                            $entries = ldap_get_entries($this->_l, $result);
+                            foreach ($entries[0]['attributetypes'] as $key => $definition) {
+                                if (stripos($definition, 'SINGLE-VALUE') !== false) {
+                                    $match = preg_match("/NAME ['\"](.*?)['\"]/", $definition, $matches);
+                                    if ($match && isset($matches[1])) {
+                                        $this->_singleValuedAttrs[$domainData['hostname']][] = strtolower($matches[1]);
+                                    }
+                                }
+                            }
+                        } else {
+                            Yii::warning("Could not read attribute Types" . ldap_error($this->_l), __METHOD__);
+                        }
+                    } else {
+                        Yii::warning("No subschema entry found!", __METHOD__);
+                    }
+                } else {
+                    Yii::warning("Could not read subschema entry: " . ldap_error($this->_l), __METHOD__);
+                }
+                Yii::debug("Single-Value Attributes now: ", __METHOD__);
+                Yii::debug($this->_singleValuedAttrs, __METHOD__);
+            }
+
             $this->_l            = $l;
             $this->_ldapBaseDn   = $domainData['baseDn'];
             $this->_username     = $username;
@@ -465,42 +502,6 @@ class LdapAuth extends BaseObject
 
             $result      = ldap_read($this->_l, '', '(objectClass=*)', ['supportedControl']);
             $supControls = ldap_get_entries($this->_l, $result);
-
-            if (empty($this->_singleValuedAttrs) || !isset($this->_singleValuedAttrs[$domain['hostname']])) {
-                $this->_singleValuedAttrs[$domain['hostname']] = [];
-                Yii::info("Getting attribute type definitions for this domain!", __METHOD__);
-
-                $result = @ldap_read($this->_l, '', "(objectClass=*)", ["subschemaSubentry"]);
-                if ($result) {
-                    $subSchema = ldap_get_entries($this->_l, $result);
-                    Yii::debug("Subschema entry:", __METHOD__);
-                    Yii::debug($subSchema, __METHOD__);
-
-                    if (isset($subSchema[0]['subschemasubentry'][0])) {
-
-                        $result = @ldap_read($this->_l, $subSchema[0]['subschemasubentry'][0], "(objectClass=*)", ["attributeTypes"]);
-
-                        if ($result) {
-                            $entries = ldap_get_entries($this->_l, $result);
-                            foreach ($entries[0]['attributetypes'] as $key => $definition) {
-                                if (stripos($definition, 'SINGLE-VALUE') !== false) {
-                                    $match = preg_match("/NAME ['\"](.*?)['\"]/", $definition, $matches);
-                                    if ($match && isset($matches[1])) {
-                                        $this->_singleValuedAttrs[$domain['hostname']][] = strtolower($matches[1]);
-                                    }
-                                }
-                            }
-                        } else {
-                            Yii::warning("Could not read attribute Types" . ldap_error($this->_l), __METHOD__);
-                        }
-                    } else {
-                        Yii::warning("No subschema entry found!", __METHOD__);
-                    }
-                } else {
-                    Yii::warning("Could not read subschema entry: " . ldap_error($this->_l), __METHOD__);
-                }
-            }
-
 
             $cookie = '';
             $requestControls = [];
