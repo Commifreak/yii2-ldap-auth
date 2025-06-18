@@ -628,10 +628,11 @@ class LdapAuth extends BaseObject
      * @param int|null $domainKey
      * @param bool $onlyActiveAccounts
      * @param bool $allDomainsHaveToBeReachable
+     * @param string|null $baseDn
      * @return array|false
      * @throws ErrorException
      */
-    public function searchGroup(?string $searchFor, array $groupAttributes = ['dn', 'member'], ?array $userAttributes = ['dn', 'samaccountname', 'mail'], bool $returnMembers = false, ?string $searchFilter = "", ?int $domainKey = null, bool $onlyActiveAccounts = false, bool $allDomainsHaveToBeReachable = false)
+    public function searchGroup(?string $searchFor, array $groupAttributes = ['dn', 'member'], ?array $userAttributes = ['dn', 'samaccountname', 'mail'], bool $returnMembers = false, ?string $searchFilter = "", ?int $domainKey = null, bool $onlyActiveAccounts = false, bool $allDomainsHaveToBeReachable = false, $baseDn = null)
     {
         if (!in_array('dn', $groupAttributes)) {
             $groupAttributes[] = 'dn';
@@ -641,10 +642,10 @@ class LdapAuth extends BaseObject
         }
 
         if (empty($searchFilter)) {
-            $searchFilter = "(&(objectCategory=group) (|(objectSid=%searchFor%)(cn=%searchFor%)))";
+            $searchFilter = "(&(objectCategory=group) (|(objectSid=%searchFor%)(cn=%searchFor%)(dn=%searchFor%)))";
         }
 
-        $groups = $this->searchUser($searchFor, $groupAttributes, $searchFilter, $domainKey, $onlyActiveAccounts, $allDomainsHaveToBeReachable);
+        $groups = $this->searchUser($searchFor, $groupAttributes, $searchFilter, $domainKey, $onlyActiveAccounts, $allDomainsHaveToBeReachable, $baseDn);
 
         if (!$returnMembers) {
             return $groups;
