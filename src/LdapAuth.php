@@ -342,8 +342,8 @@ class LdapAuth extends BaseObject
                 } else {
                     Yii::warning("Could not read subschema entry: " . ldap_error($l), __METHOD__);
                 }
-                Yii::debug("Single-Value Attributes now: ", __METHOD__);
-                Yii::debug($this->_singleValuedAttrs, __METHOD__);
+//                Yii::debug("Single-Value Attributes now: ", __METHOD__);
+//                Yii::debug($this->_singleValuedAttrs, __METHOD__);
             }
 
             $this->_l            = $l;
@@ -366,10 +366,11 @@ class LdapAuth extends BaseObject
     public function fetchUserData($attributes = "")
     {
         if (empty($attributes)) {
-            $attributes = ['sn', 'objectSid', 'sIDHistory', 'givenName', 'mail', 'telephoneNumber'];
+            $attributes = ['sn', 'givenName', 'mail', 'telephoneNumber'];
         }
 
         array_push($attributes, 'objectSid'); # Push objectsid, regardless of source array, as we need it ALWAYS!
+        array_push($attributes, 'objectGUID'); # Push objectGUID, regardless of source array, as we need it ALWAYS!
         array_push($attributes, 'sIDHistory'); # Push sIDHistory, regardless of source array, as we need it ALWAYS!
 
         $baseDN        = $this->_ldapBaseDn;
@@ -397,8 +398,9 @@ class LdapAuth extends BaseObject
                 return false;
             }
             $sid        = self::SIDtoString($entries[0]['objectsid'])[0];
+            $guid = isset($entries[0]['objectGUID']) ? self::convertObjectGUID2Str($entries[0]['objectGUID']) : null;
             $sidHistory = isset($entries[0]['sidhistory']) ? self::SIDtoString($entries[0]['sidhistory']) : null;
-            return array_merge(['sid' => $sid, 'sidhistory' => $sidHistory], $this->handleEntry($entries[0]));
+            return array_merge(['sid' => $sid, 'guid' => $guid, 'sidhistory' => $sidHistory], $this->handleEntry($entries[0]));
         } else {
             Yii::error('[FetchUserData]: Search failed: ' . ldap_error($this->_l), __METHOD__);
             return false;
@@ -420,10 +422,11 @@ class LdapAuth extends BaseObject
     {
 
         if (empty($attributes)) {
-            $attributes = ['sn', 'objectSid', 'sIDHistory', 'givenName', 'mail', 'telephoneNumber', 'l', 'physicalDeliveryOfficeName'];
+            $attributes = ['sn', 'givenName', 'mail', 'telephoneNumber', 'l', 'physicalDeliveryOfficeName'];
         }
 
         array_push($attributes, 'objectSid'); # Push objectsid, regardless of source array, as we need it ALWAYS!
+        array_push($attributes, 'objectGUID'); # Push objectGUID, regardless of source array, as we need it ALWAYS!
         array_push($attributes, 'sIDHistory'); # Push sIDHistory, regardless of source array, as we need it ALWAYS!
 
         $onlyActive = '';
@@ -541,6 +544,7 @@ class LdapAuth extends BaseObject
                             continue;
                         }
                         $sid        = self::SIDtoString($entry['objectsid'])[0];
+                        $guid = isset($entry['objectGUID']) ? self::convertObjectGUID2Str($entry['objectGUID']) : null;
                         $sidHistory = isset($entry['sidhistory']) ? self::SIDtoString($entry['sidhistory']) : null;
 
 
@@ -564,7 +568,7 @@ class LdapAuth extends BaseObject
                         }
 
 
-                        $additionalData = ['sid' => $sid, 'sidhistory' => $sidHistory, 'dn' => $entry['dn'], 'domainKey' => $i];
+                        $additionalData = ['sid' => $sid, 'guid' => $guid, 'sidhistory' => $sidHistory, 'dn' => $entry['dn'], 'domainKey' => $i];
                         if (count($this->domains) > 1) {
                             // Enable domainName output if more than one domains configured
                             $additionalData['domainName'] = $this->domains[$i]['name'];
@@ -739,12 +743,33 @@ class LdapAuth extends BaseObject
         return $results;
     }
 
+    private static function convertObjectGUID2Str(string $oguid): string
+    {
+        $hex_guid             = bin2hex($oguid);
+        $hex_guid_to_guid_str = '';
+        for ($k = 1; $k <= 4; ++$k) {
+            $hex_guid_to_guid_str .= substr($hex_guid, 8 - 2 * $k, 2);
+        }
+        $hex_guid_to_guid_str .= '-';
+        for ($k = 1; $k <= 2; ++$k) {
+            $hex_guid_to_guid_str .= substr($hex_guid, 12 - 2 * $k, 2);
+        }
+        $hex_guid_to_guid_str .= '-';
+        for ($k = 1; $k <= 2; ++$k) {
+            $hex_guid_to_guid_str .= substr($hex_guid, 16 - 2 * $k, 2);
+        }
+        $hex_guid_to_guid_str .= '-' . substr($hex_guid, 16, 4);
+        $hex_guid_to_guid_str .= '-' . substr($hex_guid, 20);
+
+        return strtoupper($hex_guid_to_guid_str);
+    }
+
     private function handleEntry($entry)
     {
         $newEntry = [];
         foreach ($entry as $attr => $value) {
 
-            if (is_int($attr) || $attr == 'objectsid' || $attr == 'sidhistory' || !isset($value['count'])) {
+            if (is_int($attr) || $attr == 'sidhistory' || !isset($value['count'])) {
                 continue;
             }
             $count = $value['count'];
