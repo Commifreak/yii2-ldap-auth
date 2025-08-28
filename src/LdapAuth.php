@@ -398,7 +398,7 @@ class LdapAuth extends BaseObject
                 return false;
             }
             $sid        = self::SIDtoString($entries[0]['objectsid'])[0];
-            $guid = isset($entries[0]['objectguid']) ? self::convertObjectGUID2Str($entries[0]['objectguid']) : null;
+            $guid = isset($entries[0]['objectguid'][0]) ? self::convertObjectGUID2Str($entries[0]['objectguid'][0]) : null;
             $sidHistory = isset($entries[0]['sidhistory']) ? self::SIDtoString($entries[0]['sidhistory']) : null;
             return array_merge(['sid' => $sid, 'guid' => $guid, 'sidhistory' => $sidHistory], $this->handleEntry($entries[0]));
         } else {
@@ -544,7 +544,7 @@ class LdapAuth extends BaseObject
                             continue;
                         }
                         $sid        = self::SIDtoString($entry['objectsid'])[0];
-                        $guid = isset($entry['objectguid']) ? self::convertObjectGUID2Str($entry['objectguid']) : null;
+                        $guid = isset($entry['objectguid'][0]) ? self::convertObjectGUID2Str($entry['objectguid'][0]) : null;
                         $sidHistory = isset($entry['sidhistory']) ? self::SIDtoString($entry['sidhistory']) : null;
 
 
