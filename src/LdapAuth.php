@@ -527,9 +527,25 @@ class LdapAuth extends BaseObject
                         Yii::error('ldap_search_error: ' . ldap_error($this->_l), __METHOD__);
                     }
                     $this->_l = null;
-                    break;
+                    return false;
                 }
-                ldap_parse_result($this->_l, $result, $errcode, $matcheddn, $errmsg, $referrals, $controls);
+                $parse = ldap_parse_result($this->_l, $result, $errcode, $matcheddn, $errmsg, $referrals, $controls);
+
+                $error = ldap_error($this->_l);
+
+                Yii::debug("Parse result:", __METHOD__);
+                Yii::debug($parse, __METHOD__);
+                Yii::debug("Errcode:", __METHOD__);
+                Yii::debug($errcode, __METHOD__);
+                Yii::debug("Errmsg:", __METHOD__);
+                Yii::debug($errmsg, __METHOD__);
+                Yii::debug($error, __METHOD__);
+                Yii::debug($controls, __METHOD__);
+
+                if (!empty($errcode)) {
+                    Yii::error("An error occured during getting the LDAP result! $errcode / $error / $errmsg", __METHOD__);
+                    return false;
+                }
 
 
                 if ($result) {
