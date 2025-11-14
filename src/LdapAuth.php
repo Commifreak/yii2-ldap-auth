@@ -508,16 +508,18 @@ class LdapAuth extends BaseObject
 
             $cookie = '';
             $requestControls = [];
-            if (($domain['pagedResultsSize'] ?? 0) > 0) {
-                if (!in_array(LDAP_CONTROL_PAGEDRESULTS, $supControls[0]['supportedcontrol'])) {
-                    Yii::error("This server does NOT support pagination!", __METHOD__);
-                }
-                $requestControls = [
-                    ['oid' => LDAP_CONTROL_PAGEDRESULTS, 'value' => ['size' => $domain['pagedResultsSize'], 'cookie' => $cookie], 'iscritical' => false]
-                ];
-            }
 
             do {
+                if (($domain['pagedResultsSize'] ?? 0) > 0) {
+                    Yii::debug("Trying to page with a page size of {$domain['pagedResultsSize']}", __METHOD__);
+                    if (!in_array(LDAP_CONTROL_PAGEDRESULTS, $supControls[0]['supportedcontrol'])) {
+                        Yii::error("This server does NOT support pagination!", __METHOD__);
+                    }
+                    $requestControls = [
+                        ['oid' => LDAP_CONTROL_PAGEDRESULTS, 'value' => ['size' => $domain['pagedResultsSize'], 'cookie' => $cookie]]
+                    ];
+                }
+
                 $result = @ldap_search($this->_l, $_baseDN, $searchFilter, $attributes, 0, -1, -1, LDAP_DEREF_NEVER, $requestControls);
                 if (!$result) {
                     // Something is wrong with the search query
@@ -598,7 +600,6 @@ class LdapAuth extends BaseObject
                 }
 
 
-                Yii::debug($controls, __METHOD__);
                 if (isset($controls[LDAP_CONTROL_PAGEDRESULTS]['value']['cookie'])) {
                     Yii::debug("Page cookie set!", __METHOD__);
                     // You need to pass the cookie from the last call to the next one
