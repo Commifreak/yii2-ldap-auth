@@ -590,11 +590,7 @@ class LdapAuth extends BaseObject
                         }
 
 
-                        $additionalData = ['sid' => $sid, 'guid' => $guid, 'sidhistory' => $sidHistory, 'dn' => $entry['dn'], 'domainKey' => $i];
-                        if (count($this->domains) > 1) {
-                            // Enable domainName output if more than one domains configured
-                            $additionalData['domainName'] = $this->domains[$i]['name'];
-                        }
+                        $additionalData = ['sid' => $sid, 'guid' => $guid, 'sidhistory' => $sidHistory, 'dn' => $entry['dn'], 'domainKey' => $i, 'domainName' => $domain['name']];
                         $return[$sid] = array_merge($additionalData, $this->handleEntry($entry));
                     }
                 }
