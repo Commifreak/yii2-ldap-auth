@@ -276,7 +276,7 @@ class LdapAuth extends BaseObject
             ldap_set_option(null, LDAP_OPT_NETWORK_TIMEOUT, 5);
             $l = @ldap_connect($hostPrefix, $port);
             if (!$l) {
-                Yii::warning('Connect failed! ' . ldap_error($l), __METHOD__);
+                Yii::warning("Connect to $hostPrefix:$port failed!", __METHOD__);
                 continue;
             }
 
