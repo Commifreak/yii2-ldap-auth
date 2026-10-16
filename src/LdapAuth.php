@@ -51,7 +51,7 @@ class LdapAuth extends BaseObject
      * Enable optional object caching. Uses Yii::$app->cache component. Or enable APCu with `forceApcuCache`
      * @var bool
      */
-    public $enableCache = false;
+    public $enableCache = true;
 
     /**
      * Force the use of APCu caching instead of the Yii2 cache component
@@ -229,6 +229,11 @@ class LdapAuth extends BaseObject
 
             Yii::debug("Processing domain " . $domainData['hostname'], __METHOD__);
 
+            if ($this->_getCache('y2ldap_connerror_' . ((string)$domainKey))) {
+                Yii::warning("Ignoring this domain, because its marked still as failed!", __METHOD__);
+                continue;
+            }
+
             $ssl = isset($domainData['useSSL']) && $domainData['useSSL'];
             Yii::debug('Use SSL here? ' . ($ssl ? 'Yes' : 'No'), __METHOD__);
 
@@ -301,7 +306,8 @@ class LdapAuth extends BaseObject
             } while ($connTry < 3 && !$connected);
 
             if ($connTry == 3 && !$connected) {
-                Yii::error("No answer from LDAP after $connTry tries!", __METHOD__);
+                Yii::error("No answer from LDAP after $connTry tries! Ignoring this domain for the next 10 mins...", __METHOD__);
+                $this->_setCache('y2ldap_connerror_' . ((string)$domainKey), true, 600);
             }
 
             if (!$b) {
@@ -446,29 +452,9 @@ class LdapAuth extends BaseObject
         $cacheKey = 'y2ldap_' . md5($searchFor . (implode("", $attributes)) . $searchFilter);
         Yii::debug("Cache-Key: " . $cacheKey, __METHOD__);
 
-        if ($this->enableCache) {
-            if (!$this->forceApcuCache) {
-                $storedValue = Yii::$app->cache->get($cacheKey);
-                if ($storedValue) {
-                    Yii::debug("[YII] Returning cached asset", __METHOD__);
-                    return $storedValue;
-                }
-                Yii::debug("Was not cached or invalid", __METHOD__);
-            } else {
-                if (apcu_exists($cacheKey)) {
-                    Yii::debug("Caching enabled and this search is stored!", __METHOD__);
-                    $apcuValue = apcu_fetch($cacheKey);
-                    if ($apcuValue !== false) {
-                        Yii::debug("[APCU] Returning cached asset!", __METHOD__);
-                        return $apcuValue;
-                    }
-                    Yii::warning("Could not return cached asset!", __METHOD__);
-                } else {
-                    Yii::debug("No cache entry!", __METHOD__);
-                }
-            }
-        } else {
-            Yii::debug("Caching disabled", __METHOD__);
+        $cachedResult = $this->_getCache($cacheKey);
+        if ($cachedResult) {
+            return $cachedResult;
         }
 
         // Default set
@@ -613,25 +599,8 @@ class LdapAuth extends BaseObject
             }
         }
 
-        if ($this->enableCache) {
-            Yii::debug("Adding cache entry", __METHOD__);
-            if (!$this->forceApcuCache) {
-                if (Yii::$app->cache->set($cacheKey, $result)) {
-                    Yii::debug("[YII] Caching succeeded!", __METHOD__);
-                } else {
-                    Yii::warning("[YII] Caching failed!", __METHOD__);
-                }
-            } else {
-                $cacheResult = apcu_store($cacheKey, $return, $this->apcuCacheTtl);
-                if (!$cacheResult) {
-                    Yii::warning("[APCU] Caching was not successful!", __METHOD__);
-                } else {
-                    Yii::debug("[APCU] Cached!", __METHOD__);
-                }
-            }
-        } else {
-            Yii::debug("Not caching: Disabled", __METHOD__);
-        }
+
+        $this->_setCache($cacheKey, $return);
 
 
         return empty($return) ? [] : $return;
@@ -812,6 +781,61 @@ class LdapAuth extends BaseObject
             @ldap_close($this->_l);
             $this->_l = null;
         }
+    }
+
+    private function _setCache($key, $value, $ttl = null)
+    {
+        if ($this->enableCache) {
+            Yii::debug("Adding cache entry", __METHOD__);
+            if (!$this->forceApcuCache) {
+                if (Yii::$app->cache->set($key, $value, $ttl)) {
+                    Yii::debug("[YII] Caching succeeded!", __METHOD__);
+                } else {
+                    Yii::warning("[YII] Caching failed!", __METHOD__);
+                }
+            } else {
+                $cacheResult = apcu_store($key, $value, $ttl);
+                if (!$cacheResult) {
+                    Yii::warning("[APCU] Caching was not successful!", __METHOD__);
+                } else {
+                    Yii::debug("[APCU] Cached!", __METHOD__);
+                }
+            }
+        } else {
+            Yii::debug("Not caching: Disabled", __METHOD__);
+            return false;
+        }
+
+    }
+
+
+    private function _getCache($key)
+    {
+        if ($this->enableCache) {
+            if (!$this->forceApcuCache) {
+                $storedValue = Yii::$app->cache->get($key);
+                if ($storedValue) {
+                    Yii::debug("[YII] Returning cached asset", __METHOD__);
+                    return $storedValue;
+                }
+                Yii::debug("Was not cached or invalid", __METHOD__);
+            } else {
+                if (apcu_exists($key)) {
+                    Yii::debug("Caching enabled and this search is stored!", __METHOD__);
+                    $apcuValue = apcu_fetch($key);
+                    if ($apcuValue !== false) {
+                        Yii::debug("[APCU] Returning cached asset!", __METHOD__);
+                        return $apcuValue;
+                    }
+                    Yii::warning("Could not return cached asset!", __METHOD__);
+                } else {
+                    Yii::debug("No cache entry!", __METHOD__);
+                }
+            }
+        } else {
+            Yii::debug("Caching disabled", __METHOD__);
+        }
+        return false;
     }
 
 }
