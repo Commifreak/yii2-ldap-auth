@@ -233,7 +233,7 @@ class LdapAuth extends BaseObject
 
             Yii::debug("Processing domain " . $domainData['hostname'], __METHOD__);
 
-            if ($this->_getCache('y2ldap_connerror_' . ((string)$domainKey))) {
+            if ($this->_getCache('y2ldap_connerror_' . $domainData['hostname'])) {
                 Yii::warning("Ignoring this domain, because its marked still as failed!", __METHOD__);
                 continue;
             }
@@ -453,6 +453,14 @@ class LdapAuth extends BaseObject
             throw new InvalidArgumentException("Search term is empty but the filter has a placeholder set! Set a term or set a new filter.");
         }
 
+        $cacheKey = 'y2ldap_' . md5(__FILE__ . $searchFor . (implode("", $attributes)) . $searchFilter);
+        Yii::debug("Cache-Key: " . $cacheKey, __METHOD__);
+
+        $cachedResult = $this->_getCache($cacheKey);
+        if ($cachedResult) {
+            return $cachedResult;
+        }
+
         // Default set
         $domains = $this->domains;
 
@@ -467,16 +475,6 @@ class LdapAuth extends BaseObject
         $return = [];
         foreach ($domains as $i => $domain) {
             Yii::debug($domain, __METHOD__);
-
-            $cacheKey = 'y2ldap_' . $domain['hostname'] . '_' . md5($searchFor . (implode("", $attributes)) . $searchFilter);
-            Yii::debug("Cache-Key: " . $cacheKey, __METHOD__);
-
-            $cachedResult = $this->_getCache($cacheKey);
-            if ($cachedResult) {
-                return $cachedResult;
-            }
-
-
             if (!$this->login($domain['publicSearchUser'], $domain['publicSearchUserPassword'], $i)) {
                 if (empty($this->_l)) {
                     Yii::error('LDAP Connect or Bind error on ' . $domain['hostname'] . ', skipping...', __METHOD__);
