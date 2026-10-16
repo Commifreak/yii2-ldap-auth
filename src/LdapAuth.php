@@ -484,9 +484,11 @@ class LdapAuth extends BaseObject
         }
 
         $return = [];
+        $cacheable = true;
         foreach ($domains as $i => $domain) {
             Yii::debug($domain, __METHOD__);
             if (!$this->login($domain['publicSearchUser'], $domain['publicSearchUserPassword'], $i)) {
+                $cacheable = false;
                 if (empty($this->_l)) {
                     Yii::error('LDAP Connect or Bind error on ' . $domain['hostname'] . ', skipping...', __METHOD__);
                 } else {
@@ -614,7 +616,9 @@ class LdapAuth extends BaseObject
         }
 
 
-        $this->_setCache($cacheKey, $return);
+        if ($cacheable) {
+            $this->_setCache($cacheKey, $return);
+        }
 
 
         return empty($return) ? [] : $return;
