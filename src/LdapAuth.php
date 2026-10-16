@@ -800,7 +800,7 @@ class LdapAuth extends BaseObject
                     Yii::warning("[YII] Caching failed!", __METHOD__);
                 }
             } else {
-                $cacheResult = apcu_store($key, $value, $ttl ? $this->apcuCacheTtl);
+                $cacheResult = apcu_store($key, $value, $ttl ?: $this->apcuCacheTtl);
                 if (!$cacheResult) {
                     Yii::warning("[APCU] Caching was not successful!", __METHOD__);
                 } else {
