@@ -93,7 +93,7 @@ class LdapAuth extends BaseObject
         // Sort the domains one time for this run!
         $autoDetectDomainKey = $this->autoDetect();
 
-        if ($autoDetectDomainKey) {
+        if ($autoDetectDomainKey !== false) {
             Yii::debug("AutoDetected domain: #" . $autoDetectDomainKey, __METHOD__);
             $detectedDomain = $this->domains[$autoDetectDomainKey];
             unset($this->domains[$autoDetectDomainKey]);
@@ -449,9 +449,21 @@ class LdapAuth extends BaseObject
             throw new InvalidArgumentException("Search term is empty but the filter has a placeholder set! Set a term or set a new filter.");
         }
 
-        $cacheKey = 'y2ldap_search_'
-            . ($domainKey === null ? 'null' : (string)$domainKey)
-            . '_' . md5(__FILE__ . $searchFor . (implode("", $attributes)) . $searchFilter);
+        $effectiveFilter = str_replace(
+            ['%searchFor%', '%onlyActive%'],
+            [addslashes($searchFor ?? ''), $onlyActive],
+            $searchFilter
+        );
+
+        $cacheKey = 'y2ldap_search_' . md5(serialize([
+                __DIR__,
+                $domainKey,
+                $effectiveFilter,
+                $attributes,
+                $onlyActiveAccounts,
+                $allDomainsHaveToBeReachable,
+                $baseDN,
+            ]));
 
         Yii::debug("Cache-Key: " . $cacheKey, __METHOD__);
 
@@ -487,10 +499,9 @@ class LdapAuth extends BaseObject
                 continue;
             }
 
-            $searchFilter = str_replace(["%searchFor%", "%onlyActive%"], [addslashes($searchFor), $onlyActive], $searchFilter);
             $_baseDN = $baseDN ?: $this->_ldapBaseDn;
 
-            Yii::debug('Search-Filter: ' . $searchFilter . " | BaseDN: " . $_baseDN, __METHOD__);
+            Yii::debug('Search-Filter: ' . $effectiveFilter . " | BaseDN: " . $_baseDN, __METHOD__);
 
             $result      = ldap_read($this->_l, '', '(objectClass=*)', ['supportedControl']);
             $supControls = ldap_get_entries($this->_l, $result);
@@ -509,7 +520,7 @@ class LdapAuth extends BaseObject
                     ];
                 }
 
-                $result = @ldap_search($this->_l, $_baseDN, $searchFilter, $attributes, 0, -1, -1, LDAP_DEREF_NEVER, $requestControls);
+                $result = @ldap_search($this->_l, $_baseDN, $effectiveFilter, $attributes, 0, -1, -1, LDAP_DEREF_NEVER, $requestControls);
                 if (!$result) {
                     // Something is wrong with the search query
                     if (is_null($this->_l)) {
