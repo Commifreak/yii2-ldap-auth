@@ -90,10 +90,6 @@ class LdapAuth extends BaseObject
             throw new Exception("Caching is enabled with Yii cache component but its not configured! :(");
         }
 
-        if (!$this->enableCache && !$this->forceApcuCache && isset(Yii::$app->cache)) {
-            Yii::warning("Yii2 cache component configured, but caching for this plugin is disabled. Consider enabling it with `enableCache`.", __METHOD__);
-        }
-
         // Sort the domains one time for this run!
         $autoDetectDomainKey = $this->autoDetect();
 
