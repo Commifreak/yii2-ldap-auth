@@ -51,7 +51,7 @@ class LdapAuth extends BaseObject
      * Enable optional object caching. Uses Yii::$app->cache component. Or enable APCu with `forceApcuCache`
      * @var bool
      */
-    public $enableCache = true;
+    public $enableCache = false;
 
     /**
      * Force the use of APCu caching instead of the Yii2 cache component
@@ -88,6 +88,10 @@ class LdapAuth extends BaseObject
 
         if ($this->enableCache && !$this->forceApcuCache && !isset(Yii::$app->cache)) {
             throw new Exception("Caching is enabled with Yii cache component but its not configured! :(");
+        }
+
+        if (!$this->enableCache && !$this->forceApcuCache && isset(Yii::$app->cache)) {
+            Yii::warning("Yii2 cache component configured, but caching for this plugin is disabled. Consider enabling it with `enableCache`.", __METHOD__);
         }
 
         // Sort the domains one time for this run!
@@ -306,8 +310,8 @@ class LdapAuth extends BaseObject
             } while ($connTry < 3 && !$connected);
 
             if ($connTry == 3 && !$connected) {
-                Yii::error("No answer from LDAP after $connTry tries! Ignoring this domain for the next 10 mins...", __METHOD__);
-                $this->_setCache('y2ldap_connerror_' . ((string)$domainKey), true, 600);
+                Yii::error("No answer from LDAP after $connTry tries!", __METHOD__);
+                $this->_setCache('y2ldap_connerror_' . $domainData['hostname'], true, 60);
             }
 
             if (!$b) {
@@ -449,14 +453,6 @@ class LdapAuth extends BaseObject
             throw new InvalidArgumentException("Search term is empty but the filter has a placeholder set! Set a term or set a new filter.");
         }
 
-        $cacheKey = 'y2ldap_' . md5($searchFor . (implode("", $attributes)) . $searchFilter);
-        Yii::debug("Cache-Key: " . $cacheKey, __METHOD__);
-
-        $cachedResult = $this->_getCache($cacheKey);
-        if ($cachedResult) {
-            return $cachedResult;
-        }
-
         // Default set
         $domains = $this->domains;
 
@@ -471,6 +467,16 @@ class LdapAuth extends BaseObject
         $return = [];
         foreach ($domains as $i => $domain) {
             Yii::debug($domain, __METHOD__);
+
+            $cacheKey = 'y2ldap_' . $domain['hostname'] . '_' . md5($searchFor . (implode("", $attributes)) . $searchFilter);
+            Yii::debug("Cache-Key: " . $cacheKey, __METHOD__);
+
+            $cachedResult = $this->_getCache($cacheKey);
+            if ($cachedResult) {
+                return $cachedResult;
+            }
+
+
             if (!$this->login($domain['publicSearchUser'], $domain['publicSearchUserPassword'], $i)) {
                 if (empty($this->_l)) {
                     Yii::error('LDAP Connect or Bind error on ' . $domain['hostname'] . ', skipping...', __METHOD__);
@@ -794,7 +800,7 @@ class LdapAuth extends BaseObject
                     Yii::warning("[YII] Caching failed!", __METHOD__);
                 }
             } else {
-                $cacheResult = apcu_store($key, $value, $ttl);
+                $cacheResult = apcu_store($key, $value, $ttl ? $this->apcuCacheTtl);
                 if (!$cacheResult) {
                     Yii::warning("[APCU] Caching was not successful!", __METHOD__);
                 } else {
