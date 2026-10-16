@@ -548,6 +548,7 @@ class LdapAuth extends BaseObject
 
                 if (!empty($errcode)) {
                     if ($errcode == 4) { // https://ldap.com/ldap-result-code-reference-core-ldapv3-result-codes/#rc-sizeLimitExceeded
+                        $cacheable = false;
                         Yii::error("You reached the sizelimit of your server! Please adjust your search query! Continuing anyway for now... ($errcode / $error / $errmsg)", __METHOD__);
                     } else {
                         Yii::error("An error occured during getting the LDAP result! $errcode / $error / $errmsg", __METHOD__);
