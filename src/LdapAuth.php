@@ -468,7 +468,7 @@ class LdapAuth extends BaseObject
         Yii::debug("Cache-Key: " . $cacheKey, __METHOD__);
 
         $cachedResult = $this->_getCache($cacheKey);
-        if ($cachedResult) {
+        if ($cachedResult !== false) {
             return $cachedResult;
         }
 
@@ -828,7 +828,7 @@ class LdapAuth extends BaseObject
         if ($this->enableCache) {
             if (!$this->forceApcuCache) {
                 $storedValue = Yii::$app->cache->get($key);
-                if ($storedValue) {
+                if ($storedValue !== false) {
                     Yii::debug("[YII] Returning cached asset", __METHOD__);
                     return $storedValue;
                 }
