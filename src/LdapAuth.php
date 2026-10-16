@@ -229,7 +229,7 @@ class LdapAuth extends BaseObject
 
             Yii::debug("Processing domain " . $domainData['hostname'], __METHOD__);
 
-            if ($this->_getCache('y2ldap_connerror_' . $domainData['hostname'])) {
+            if ($this->_getCache('y2ldap_connerror_' . $domainData['hostname'], true)) {
                 Yii::warning("Ignoring this domain, because its marked still as failed!", __METHOD__);
                 continue;
             }
@@ -307,7 +307,7 @@ class LdapAuth extends BaseObject
 
             if ($connTry == 3 && !$connected) {
                 Yii::error("No answer from LDAP after $connTry tries!", __METHOD__);
-                $this->_setCache('y2ldap_connerror_' . $domainData['hostname'], true, 60);
+                $this->_setCache('y2ldap_connerror_' . $domainData['hostname'], true, 60, true);
             }
 
             if (!$b) {
@@ -802,9 +802,9 @@ class LdapAuth extends BaseObject
         }
     }
 
-    private function _setCache($key, $value, $ttl = null)
+    private function _setCache($key, $value, $ttl = null, $force = false)
     {
-        if ($this->enableCache) {
+        if ($this->enableCache || ($force && isset(Yii::$app->cache))) {
             Yii::debug("Adding cache entry", __METHOD__);
             if (!$this->forceApcuCache) {
                 if (Yii::$app->cache->set($key, $value, $ttl)) {
@@ -828,9 +828,9 @@ class LdapAuth extends BaseObject
     }
 
 
-    private function _getCache($key)
+    private function _getCache($key, $force = false)
     {
-        if ($this->enableCache) {
+        if ($this->enableCache || ($force && isset(Yii::$app->cache))) {
             if (!$this->forceApcuCache) {
                 $storedValue = Yii::$app->cache->get($key);
                 if ($storedValue !== false) {
