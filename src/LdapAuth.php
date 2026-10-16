@@ -453,7 +453,10 @@ class LdapAuth extends BaseObject
             throw new InvalidArgumentException("Search term is empty but the filter has a placeholder set! Set a term or set a new filter.");
         }
 
-        $cacheKey = 'y2ldap_' . md5(__FILE__ . $searchFor . (implode("", $attributes)) . $searchFilter);
+        $cacheKey = 'y2ldap_search_'
+            . ($domainKey === null ? 'null' : (string)$domainKey)
+            . '_' . md5(__FILE__ . $searchFor . (implode("", $attributes)) . $searchFilter);
+
         Yii::debug("Cache-Key: " . $cacheKey, __METHOD__);
 
         $cachedResult = $this->_getCache($cacheKey);
